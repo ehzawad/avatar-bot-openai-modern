@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aria OpenAI Avatar</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/assets/css/styles.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.154.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.154.0/examples/jsm/",
+          "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@2.0.6/lib/three-vrm.module.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div class="glow glow-a"></div>
+    <div class="glow glow-b"></div>
+
+    <div id="canvas-root" aria-label="3D avatar viewport"></div>
+
+    <header class="panel topbar">
+      <div>
+        <div class="eyebrow">OpenAI Responses API avatar</div>
+        <h1>Aria</h1>
+      </div>
+      <div class="status-pill"><span id="status-dot" class="dot ready"></span><span id="status-text">Booting</span></div>
+    </header>
+
+    <main class="side-stack">
+      <section class="panel chat-panel">
+        <div class="panel-title">
+          <span>Conversation</span>
+          <button id="new-chat" class="ghost-button" type="button">New</button>
+        </div>
+        <div id="messages" class="messages" aria-live="polite"></div>
+      </section>
+
+      <section class="panel config-panel">
+        <div class="panel-title">Runtime</div>
+        <dl class="runtime-grid">
+          <dt>Model</dt><dd id="runtime-model">...</dd>
+          <dt>Speech</dt><dd id="runtime-tts">...</dd>
+          <dt>Voice</dt><dd><select id="voice-select"></select></dd>
+        </dl>
+        <label class="file-label">
+          <input id="model-file" type="file" accept=".vrm,.glb,.gltf" />
+          Load VRM/GLB avatar
+        </label>
+      </section>
+    </main>
+
+    <footer class="composer panel">
+      <button id="mic" class="round-button" type="button" title="Record voice">●</button>
+      <button id="live-mode" class="live-button" type="button" aria-pressed="false" title="Live interview mode">Live</button>
+      <input id="input" type="text" autocomplete="off" placeholder="Ask Aria something..." />
+      <button id="send" class="send-button" type="button">Send</button>
+    </footer>
+
+    <template id="message-template">
+      <div class="message">
+        <div class="label"></div>
+        <div class="bubble"></div>
+      </div>
+    </template>
+
+    <script type="module" src="/src/app.js"></script>
+  </body>
+</html>
