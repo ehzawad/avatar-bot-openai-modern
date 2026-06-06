@@ -1,5 +1,7 @@
 # Live Interview Mode
 
+For a visual sequence diagram and state machine, see [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md).
+
 Live interview mode makes Aria feel closer to a human interviewer or live support agent without exposing the OpenAI API key to the browser.
 
 ## Runtime Flow

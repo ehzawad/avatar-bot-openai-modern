@@ -51,6 +51,8 @@ The `Live` control turns the microphone into a pause-detected interview loop. Ar
 
 See [docs/LIVE_INTERVIEW_MODE.md](docs/LIVE_INTERVIEW_MODE.md) for the runtime flow and tuning points.
 
+For visual system maps and request-flow diagrams, see [docs/SYSTEM_DESIGN.md](docs/SYSTEM_DESIGN.md).
+
 ## API surface
 
 ```text

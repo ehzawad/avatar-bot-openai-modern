@@ -1,5 +1,7 @@
 # Architecture
 
+For visual system maps, request flow diagrams, state machines, and security boundaries, see [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md).
+
 ## Backend modules
 
 `app/main.py` wires FastAPI, static frontend serving, CORS, and application state.
