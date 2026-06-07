@@ -1,9 +1,9 @@
 # Unified Frontend Architecture (`web/`)
 
-This document describes the architecture of the **single** frontend app, `web/` — a Vite + React
-+ TypeScript SPA that serves both the avatar (at `/`) and the Bengali Conversational Eval Studio
-(at `/studio`). It is the design companion to the run instructions in the
-[README](../README.md).
+This document describes the architecture of the **single** frontend app, `web/` — a Vite + React +
+TypeScript SPA that serves the landing page (at `/`), Aria (at `/avatar`), and the Bengali
+Conversational Eval Studio (at `/studio`). It is the design companion to the run instructions in
+the [README](../README.md).
 
 The authoritative frozen spec is [WEB_CONTRACT.md](WEB_CONTRACT.md); the studio API/schema spec is
 [STUDIO_CONTRACT.md](STUDIO_CONTRACT.md). This document does **not** add endpoints or fields — it
@@ -13,14 +13,15 @@ avatar) and `studio-web/` (standalone studio) apps are retired and replaced by `
 ## Why one app
 
 The avatar and the studio used to be two separate frontends mounted at two paths. They are now one
-Vite app with one build, one router, and one shared library layer. This removes duplicated HTTP
-clients, recorder logic, and TypeScript types, and lets FastAPI serve a single SPA. The two
-surfaces are kept apart by **code splitting and CSS namespacing**, not by being separate apps.
+Vite app with one build, one router, a lightweight landing page, and one shared library layer. This
+removes duplicated HTTP clients, recorder logic, and TypeScript types, and lets FastAPI serve a
+single SPA. The two tool surfaces are kept apart by **code splitting and CSS namespacing**, not by
+being separate apps.
 
 The hard boundary that makes a single app safe: **Three.js / `@pixiv/three-vrm` are imported only
 under `web/src/features/avatar/**`.** They must never be reachable (even transitively) from
-`lib/**`, `router.tsx`, `main.tsx`, or `features/studio/**`. Because the routes are lazy, the
-`/studio` chunk never pulls Three.
+`lib/**`, `router.tsx`, `main.tsx`, `features/home/**`, or `features/studio/**`. The landing page
+is eager but imports no avatar code; lazy tool routes keep `/studio` from ever pulling Three.
 
 ## Layout
 
@@ -45,6 +46,9 @@ web/
       audio/useRecorder.ts    # ONE shared recorder hook (manual + live/silence)
       hooks/useLatest.ts      # ref-of-latest-value helper for race guards
     features/
+      home/               # eager lightweight landing page — no Three
+        HomeApp.tsx
+        home.css              # all selectors namespaced under .home
       avatar/             # lazy chunk — the ONLY place Three.js lives
         route.tsx
         AvatarApp.tsx
@@ -74,17 +78,26 @@ dev: `vite@7`, `@vitejs/plugin-react`, `typescript@5`, the `@types/*`. Scripts: 
 `router.tsx` uses React Router 7 in data mode with **no basename** (the app is served from `/`):
 
 ```ts
+import HomeApp from './features/home/HomeApp';
+
 createBrowserRouter([
   { path: '/', children: [
-    { index: true,        lazy: () => import('./features/avatar/route') }, // avatar
+    { index: true,        Component: HomeApp },                           // landing
+    { path: 'avatar',     lazy: () => import('./features/avatar/route') }, // avatar
     { path: 'studio/*',   lazy: () => import('./features/studio/route') }, // studio
   ]},
 ])
 ```
 
-Each `route.tsx` is the lazily-imported entry for its feature. Lazy imports are what enforce the
-Three boundary at the bundle level: visiting `/studio` never evaluates the avatar module, so its
-chunk contains no Three.js. Each page's header links to the other surface (`/` ⇄ `/studio`).
+The home route is imported eagerly and must stay lightweight. Each tool `route.tsx` is the
+lazily-imported entry for its feature. Lazy imports are what enforce the Three boundary at the
+bundle level: visiting `/` or `/studio` never evaluates the avatar module, so those routes contain
+no Three.js. Navigation targets are explicit: Home (`/`) offers Avatar (`/avatar`) and Studio
+(`/studio`); Avatar links to Home + Studio; Studio links to Home + Avatar.
+
+Lazy tool routes use a small route-level `hydrateFallbackElement` for initial route-module loading.
+Do not add `fallbackElement` to `RouterProvider`; React Router 7.17 uses route-level
+`HydrateFallback` / `hydrateFallbackElement` instead.
 
 ## Shared `lib/` boundary
 
@@ -231,7 +244,8 @@ if WEB_DIST.exists():
 ```
 
 - API routes are matched first; hashed assets are served from `/assets/*`; any other route falls
-  back to `index.html`, so a hard reload of `/studio` returns the SPA rather than a 404.
+  back to `index.html`, so a hard reload of `/avatar` or `/studio` returns the SPA rather than a
+  404.
 - A missing asset (a path with a file extension, or anything under `api/`) returns a real 404
   instead of `index.html`, so broken asset URLs fail loudly.
 - The serve block is guarded by `WEB_DIST.exists()`, so the backend still imports and runs before
@@ -242,8 +256,9 @@ if WEB_DIST.exists():
 ## CSS namespacing
 
 `styles/base.css` carries only neutral resets and shared design tokens (CSS variables) — no
-component-level globals. Each feature scopes all of its selectors: avatar styles under
-`.avatar-app` (`features/avatar/avatar.css`) and studio styles under `.studio-app`
-(`features/studio/studio.css`). Because the two surfaces share one document and one stylesheet
-bundle, this prevents selectors like `.btn` or bare element rules from leaking across routes while
-preserving the shared glassy-dark aesthetic (glow accents, status pill).
+component-level globals. Each feature scopes all of its selectors: home styles under
+`.home` (`features/home/home.css`), avatar styles under `.avatar-app`
+(`features/avatar/avatar.css`), and studio styles under `.studio-app` (`features/studio/studio.css`).
+Because the surfaces share one document and one stylesheet bundle, this prevents selectors like
+`.btn` or bare element rules from leaking across routes while preserving the shared glassy-dark
+aesthetic (glow accents, status pill).

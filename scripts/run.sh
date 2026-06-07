@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# One-command launcher for the unified app (avatar at /, Bengali eval studio at /studio).
+# One-command launcher for the unified app (landing at /, avatar at /avatar, studio at /studio).
 #
 #   ./scripts/run.sh         Build the web/ SPA, then serve everything from ONE process.
-#                            Open http://HOST:PORT/  (avatar)  and  /studio  (studio).
+#                            Open http://HOST:PORT/  (landing), /avatar, and /studio.
 #   ./scripts/run.sh dev     Hot-reload mode: backend + Vite dev server together; open the
 #                            Vite URL it prints. (Two processes, one terminal — Ctrl-C stops both.)
 #
@@ -77,13 +77,14 @@ if [[ "${SKIP_BUILD:-0}" == "1" ]]; then
   echo "==> SKIP_BUILD=1 — reusing existing web/dist"
 else
   need_node
-  echo "==> Building the web/ SPA (avatar + studio)"
+  echo "==> Building the web/ SPA (landing + avatar + studio)"
   (cd web && npm install --silent && npm run build)
 fi
 
 echo
 echo "==> Aria is starting on http://${HOST}:${PORT}"
-echo "      Avatar:  http://${HOST}:${PORT}/"
+echo "      Home:    http://${HOST}:${PORT}/"
+echo "      Avatar:  http://${HOST}:${PORT}/avatar"
 echo "      Studio:  http://${HOST}:${PORT}/studio"
 echo "      API docs: http://${HOST}:${PORT}/docs"
 echo

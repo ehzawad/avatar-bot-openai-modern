@@ -46,7 +46,7 @@ rejected as a revision conflict instead of silently clobbering newer state.
 ### Frontend (React / Vite / TanStack Query / zundo)
 
 The studio is the `studio` feature of the unified `web/` app (React 19 + Vite + TypeScript),
-served at `/studio` and lazy-loaded so it never pulls the avatar's Three.js code. See
+served at `/studio` and lazy-loaded so it never pulls Aria's Three.js code from `/avatar`. See
 [WEB_ARCHITECTURE.md](WEB_ARCHITECTURE.md) for the overall frontend layout. Within that app:
 
 - **TanStack Query** owns server state: datasets, a single dataset's detail, and its revisions,

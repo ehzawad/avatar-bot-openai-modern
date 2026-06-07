@@ -1,14 +1,46 @@
 import { createBrowserRouter } from 'react-router';
 
+import HomeApp from './features/home/HomeApp';
+
+function RouteFallback() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        minHeight: '100dvh',
+        display: 'grid',
+        placeItems: 'center',
+        background: 'var(--bg)',
+        color: 'var(--muted)',
+        fontFamily: 'var(--ui-font)',
+      }}
+    >
+      Loading...
+    </div>
+  );
+}
+
+const hydrateFallbackElement = <RouteFallback />;
+
 // Data-mode router, NO basename (the app is served from '/').
-// Lazy routes so the avatar chunk (Three.js / @pixiv/three-vrm) only loads on '/'
-// and the studio chunk loads only under '/studio/*'.
+// The landing page is eager and lightweight. Lazy feature routes keep
+// Three.js / @pixiv/three-vrm out of the landing chunk and load them only on '/avatar'.
 export const router = createBrowserRouter([
   {
     path: '/',
     children: [
-      { index: true, lazy: () => import('./features/avatar/route') },
-      { path: 'studio/*', lazy: () => import('./features/studio/route') },
+      { index: true, Component: HomeApp },
+      {
+        path: 'avatar',
+        hydrateFallbackElement,
+        lazy: () => import('./features/avatar/route'),
+      },
+      {
+        path: 'studio/*',
+        hydrateFallbackElement,
+        lazy: () => import('./features/studio/route'),
+      },
     ],
   },
 ]);

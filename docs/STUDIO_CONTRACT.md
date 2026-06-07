@@ -1,9 +1,11 @@
 # Bengali Conversational Eval Studio — FROZEN CONTRACT (v1)
 
-> **SUPERSEDED in two places by later work:** (1) the frontend now lives in the unified `web/`
-> app (see [WEB_CONTRACT.md](WEB_CONTRACT.md)), not `studio-web/`; (2) the transcription tiers are
-> now `fast` / `best` / **`diarize`** (`gpt-4o-transcribe-diarize`) — the `whisper` / `whisper-1`
-> tier and `OPENAI_TRANSCRIBE_MODEL_WHISPER` were removed. Everything else below still holds.
+> **SUPERSEDED in three places by later work:** (1) the frontend now lives in the unified `web/`
+> app (see [WEB_CONTRACT.md](WEB_CONTRACT.md)), not `studio-web/`; (2) `/` is now the landing
+> page, the avatar app is at `/avatar`, and the studio remains at `/studio`; (3) the transcription
+> tiers are now `fast` / `best` / **`diarize`** (`gpt-4o-transcribe-diarize`) — the `whisper` /
+> `whisper-1` tier and `OPENAI_TRANSCRIBE_MODEL_WHISPER` were removed. Everything else below still
+> holds.
 
 This document is the **single source of truth**. Backend, frontend, and docs are all
 implemented against it. Do **not** invent endpoint names, field names, table names, or JSON
@@ -23,8 +25,8 @@ cards; auto-roll to a new page when full; per-page interactive line editor; dura
 download `.txt` and `.jsonl`.
 
 **Guardrails (do not violate):**
-- The existing avatar app at `/` must keep working. Do **not** modify `frontend/` behavior,
-  `app/api/routes/conversations.py`, `app/api/routes/health.py`, or the avatar prompts.
+- The existing avatar app at `/avatar` must keep working. Do **not** modify avatar conversation
+  behavior, `app/api/routes/conversations.py`, `app/api/routes/health.py`, or the avatar prompts.
 - Keep OpenAI access as direct `httpx` (no SDK).
 - SQLite DB and audio live under `data/` (created at runtime) — **never** under any
   `StaticFiles` directory and never web-served. `data/` is gitignored.
@@ -322,7 +324,7 @@ studio-web/
   index.html
   src/
     main.tsx              # mounts <App/> in QueryClientProvider (staleTime ~5s, refetchOnWindowFocus:false, retry:1)
-    App.tsx               # StudioApp shell + header (link back to avatar app at '/')
+    App.tsx               # StudioApp shell + header (link back to avatar app at '/avatar')
     api/client.ts         # typed fetch helpers (root-relative /api/...), FormData for capture
     api/queries.ts        # TanStack hooks: useDatasets, useDataset, useRevisions + mutations
                           #   (useCapture, useAddLine, useEditLine, useDeleteLine, useReorder,

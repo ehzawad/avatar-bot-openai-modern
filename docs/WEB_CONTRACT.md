@@ -18,7 +18,8 @@ cleanup, polished/consistent UI. Where a detail is unspecified, choose the robus
   `/api/conversations`, `/api/speech`, the existing dataset routes, CORS, or storage logic.
 - Three.js / `@pixiv/three-vrm` imports live **only** under `web/src/features/avatar/**`. They
   must never be imported (even transitively) by `lib/**`, `router.tsx`, `main.tsx`, or
-  `features/studio/**` — verify `/studio`'s chunk does not pull Three.
+  `features/home/**` or `features/studio/**` — verify the landing bundle and `/studio` chunk do
+  not pull Three.
 - `data/` (sqlite + audio) stays non-web-served. Serve only `web/dist`.
 - Preserve the existing visual aesthetic (glassy dark panels, glow accents, status pill) from
   `frontend/assets/css/styles.css` and `studio-web/src/styles.css`; unify into a consistent look.
@@ -47,6 +48,9 @@ web/
       audio/useRecorder.ts    # ONE shared recorder hook, manual + live/silence (see §5)
       hooks/useLatest.ts      # ref-of-latest-value helper
     features/
+      home/
+        HomeApp.tsx       # eager lightweight option page linking to Aria and Bengali Eval Studio
+        home.css          # ALL selectors namespaced under .home
       avatar/
         route.tsx         # default export route element; lazy-loaded
         AvatarApp.tsx     # page shell (full-window canvas + glassy panels)
@@ -76,15 +80,23 @@ devDeps: `vite@^7`, `@vitejs/plugin-react`, `typescript@^5`, `@types/react`, `@t
 
 ## 3. Router (React Router 7, data mode, no basename)
 ```ts
+import HomeApp from './features/home/HomeApp';
+
 createBrowserRouter([
   { path: '/', children: [
-    { index: true, lazy: () => import('./features/avatar/route') },   // avatar
+    { index: true, Component: HomeApp },                              // landing
+    { path: 'avatar', lazy: () => import('./features/avatar/route') }, // avatar
     { path: 'studio/*', lazy: () => import('./features/studio/route') }, // studio
   ]},
 ])
 ```
-Each `route.tsx` exports `{ Component }` (or `default`) per the router API used. Lazy so Three.js
-only loads on `/`. Header on each page links to the other (`/` ⇄ `/studio`).
+The landing route is eager and must stay lightweight. Each tool `route.tsx` exports `{ Component }`
+(or `default`) per the router API used. Lazy so Three.js only loads on `/avatar`. Navigation is:
+landing links to both tools (`/avatar`, `/studio`); Avatar links to Home + Studio; Studio links to
+Home + Avatar. Tool headers must not link to `/` as if it were the avatar.
+
+Lazy tool routes may define a small route-level `hydrateFallbackElement` / `HydrateFallback` for
+loading. Do **not** use `RouterProvider fallbackElement`; it is not accepted by React Router 7.17.
 
 ## 4. Avatar/conversation TS types (`lib/api/types.ts`)
 ```ts
@@ -258,18 +270,19 @@ if WEB_DIST.exists():
 
 ## 11. Verification gates
 - Frontend: `cd web && npm install && npm run build` → type-clean, emits `dist/`. Inspect the
-  build output: the `/studio` (studio) chunk must NOT include three/@pixiv/three-vrm; the avatar
-  chunk is separate (lazy). Self-fix until clean.
+  build output: the initial landing bundle and `/studio` chunk must NOT include
+  three/@pixiv/three-vrm; the avatar chunk is separate (lazy). Self-fix until clean.
 - Backend: `python -c "import app.main"` clean; `python scripts/smoke_datasets.py` passes incl. the
   new tag + CSV assertions.
-- Live: start uvicorn (web/dist built), assert: `GET /` returns the SPA, `GET /studio` hard-reload
-  returns the SPA (not 404), `GET /api/health` JSON works, a missing `/assets/x.js` returns 404
-  (not index.html), CSV download has correct quoting, tag round-trips.
-- Headless render: `/` shows a non-blank canvas + WebGL context + 0 console errors (fallback
-  avatar); `/studio` lists dataset cards + 0 console errors. (Visual fidelity = manual; note it.)
+- Live: start uvicorn (web/dist built), assert: `GET /`, `GET /avatar`, and `GET /studio`
+  hard-reload to the SPA (not 404), `GET /api/health` JSON works, a missing `/assets/x.js` returns
+  404 (not index.html), CSV download has correct quoting, tag round-trips.
+- Headless render: `/` shows the two landing option cards, `/avatar` shows a non-blank canvas +
+  WebGL context + 0 console errors (fallback avatar), and `/studio` lists dataset cards + 0 console
+  errors. (Visual fidelity = manual; note it.)
 
 ## 12. Integration review (final)
-Check: no Three import reachable from lib/router/main/studio; CSS namespacing (no `.btn`/`body`
+Check: no Three import reachable from lib/router/main/home/studio; CSS namespacing (no `.btn`/`body`
 leakage across routes); SPA fallback precedence vs `/api` and `/assets`; recorder live semantics
 preserved; useAvatarChat race-guard tokens present; cleanup checklist implemented; tag nullable +
 CSV RFC-4180; `data/` not web-served; avatar conversation/types match backend responses.

@@ -13,22 +13,24 @@ The browser owns rendering, audio playback, lip-sync, microphone capture, and UI
 - OpenAI transcription endpoint for browser-recorded voice input.
 - Live interview mode that listens for speech, detects a pause, then replies aloud and resumes listening.
 - Server-side in-memory conversation sessions using `previous_response_id` for continuity.
-- Unified frontend: a single Vite + React + TypeScript app in `web/` serves **both** the avatar
-  (at `/`) and the Bengali Eval Studio (at `/studio`).
+- Unified frontend: a single Vite + React + TypeScript app in `web/` serves a lightweight landing
+  page (at `/`), Aria (at `/avatar`), and the Bengali Eval Studio (at `/studio`).
 - Modular backend: routes, domain schemas, application service, session store, and OpenAI adapter are separate modules.
 
 ## Unified frontend (`web/`)
 
-There is now **one** frontend app: `web/` (Vite + React + TypeScript). It contains both surfaces
-behind a single React Router, code-split into lazy chunks:
+There is now **one** frontend app: `web/` (Vite + React + TypeScript). It contains a landing page
+and both tool surfaces behind a single React Router, code-split into lazy chunks:
 
-- `/` — the avatar app (Three.js / VRM scene, voice loop, live interview mode).
+- `/` — the lightweight option landing page.
+- `/avatar` — Aria, the avatar app (Three.js / VRM scene, voice loop, live interview mode).
 - `/studio` — the Bengali Conversational Eval Studio.
 
 FastAPI serves the single built SPA from `web/dist`: API routes are matched first, hashed assets
 are served from `/assets/*`, and any other path falls back to `index.html` so client-side routes
-(including a hard reload of `/studio`) resolve. The Three.js / `@pixiv/three-vrm` code lives only
-under `web/src/features/avatar/**` and is lazy-loaded, so the `/studio` chunk never pulls Three.
+(including a hard reload of `/avatar` or `/studio`) resolve. The Three.js / `@pixiv/three-vrm`
+code lives only under `web/src/features/avatar/**` and is lazy-loaded, so the initial landing
+bundle and the `/studio` chunk never pull Three.
 
 > **`frontend/` and `studio-web/` are retired.** They have been replaced by `web/`. The legacy
 > avatar app (`frontend/`) and the standalone studio app (`studio-web/`) are no longer the way to
@@ -57,7 +59,8 @@ there — the dev script and the app read the same runtime settings).
 
 ```zsh
 ./scripts/run.sh          # creates .venv + installs deps, builds web/, serves ONE process
-                          #   avatar -> http://127.0.0.1:8000/    studio -> /studio
+                          #   home -> http://127.0.0.1:8000/
+                          #   avatar -> /avatar    studio -> /studio
 ./scripts/run.sh dev      # hot-reload: backend + Vite dev server together (open the Vite URL)
 ```
 
@@ -76,7 +79,7 @@ cd web && npm install && npm run dev
 
 Open the **Vite** URL it prints (e.g. `http://localhost:5173/`), not port 8000, in dev mode. The
 Vite dev server proxies `/api` to `http://127.0.0.1:8000`, so all API calls stay root-relative.
-`/` is the avatar, `/studio` is the studio.
+`/` is the landing page, `/avatar` is Aria, and `/studio` is the studio.
 
 ### Prod — one URL served by FastAPI
 
@@ -91,7 +94,8 @@ source .venv/bin/activate && uvicorn app.main:app --port 8000
 Open:
 
 ```text
-http://127.0.0.1:8000/              # the avatar app
+http://127.0.0.1:8000/              # landing page
+http://127.0.0.1:8000/avatar        # Aria
 http://127.0.0.1:8000/studio        # the Bengali Eval Studio
 ```
 
@@ -128,11 +132,11 @@ POST   /api/speech/transcriptions
 
 ## Architecture
 
-The unified `web/` app is a single Vite + React + TS SPA with a React Router that lazy-loads two
-feature areas (`features/avatar`, `features/studio`) over a shared `lib/` boundary (HTTP client,
-TanStack Query hooks, shared recorder). FastAPI serves the one `web/dist` build for all non-API
-routes. See [docs/WEB_ARCHITECTURE.md](docs/WEB_ARCHITECTURE.md) for the full frontend design and
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the backend module map.
+The unified `web/` app is a single Vite + React + TS SPA with a lightweight landing page and
+lazy-loaded tool areas (`features/avatar`, `features/studio`) over a shared `lib` boundary (HTTP
+client, TanStack Query hooks, shared recorder). FastAPI serves the one `web/dist` build for all
+non-API routes. See [docs/WEB_ARCHITECTURE.md](docs/WEB_ARCHITECTURE.md) for the full frontend
+design and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the backend module map.
 
 ```text
 Browser UI
@@ -156,7 +160,10 @@ Browser microphone
 
 The studio is a voice-first tool for building a **Bengali conversational eval dataset**. The loop is Record → Stop → transcribe (Bengali) → append the transcript as a new line on the active "page". Pages are shown as cards, auto-roll to a new page when full, and each page has an interactive line editor, durable rollback, and `.txt` / `.jsonl` downloads.
 
-It is additive to the avatar app: the existing avatar at `/` keeps working, OpenAI access stays direct `httpx` (no SDK), and all studio code lives in a new `datasets` router plus a `dataset_store` service. The frozen contract is [docs/STUDIO_CONTRACT.md](docs/STUDIO_CONTRACT.md); a focused guide is [docs/EVAL_STUDIO.md](docs/EVAL_STUDIO.md).
+It is additive to the avatar app: Aria remains available at `/avatar`, OpenAI access stays direct
+`httpx` (no SDK), and all studio code lives in a new `datasets` router plus a `dataset_store`
+service. The frozen contract is [docs/STUDIO_CONTRACT.md](docs/STUDIO_CONTRACT.md); a focused
+guide is [docs/EVAL_STUDIO.md](docs/EVAL_STUDIO.md).
 
 ### How to run
 

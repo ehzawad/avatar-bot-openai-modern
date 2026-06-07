@@ -85,11 +85,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
   padding: 16px 22px;
 }
 .avatar-app .topbar-right {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 12px;
 }
 .avatar-app .nav-link {
@@ -368,9 +371,15 @@
 @media (max-width: 780px) {
   .avatar-app .topbar {
     min-height: 66px;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .avatar-app .topbar-right {
+    justify-content: flex-start;
   }
   .avatar-app .side-stack {
-    top: 98px;
+    top: 142px;
     bottom: 104px;
     width: calc(100vw - 40px);
   }

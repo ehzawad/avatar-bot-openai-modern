@@ -130,9 +130,17 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
   padding-bottom: 14px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 16px;
+}
+.studio-app .header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 .studio-app .app-brand h1 {
   margin: 0;
@@ -150,6 +158,15 @@
 @media (max-width: 1100px) {
   .studio-app .app-main {
     grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 680px) {
+  .studio-app .app-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .studio-app .header-actions {
+    justify-content: flex-start;
   }
 }
 

@@ -163,8 +163,11 @@ export default function AvatarApp() {
           <h1>Aria</h1>
         </div>
         <div className="topbar-right">
+          <Link className="nav-link" to="/">
+            Home
+          </Link>
           <Link className="nav-link" to="/studio">
-            Studio →
+            Studio
           </Link>
           <StatusPill label={chat.status.label} tone={chat.status.tone} />
         </div>

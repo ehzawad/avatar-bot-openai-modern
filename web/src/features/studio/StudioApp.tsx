@@ -300,9 +300,14 @@ export function StudioApp() {
             <h1>Bengali Eval Studio</h1>
             <span className="muted">Voice-first conversational dataset builder</span>
           </div>
-          <Link className="btn" to="/" title="Back to avatar app">
-            ← Avatar app
-          </Link>
+          <nav className="header-actions" aria-label="Workspace navigation">
+            <Link className="btn" to="/">
+              Home
+            </Link>
+            <Link className="btn" to="/avatar" title="Open Aria">
+              Aria
+            </Link>
+          </nav>
         </header>
 
         <RecordBar
