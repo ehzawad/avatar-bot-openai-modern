@@ -29,7 +29,8 @@ export function RollbackTimeline({ datasetId, currentRevisionId }: Props) {
     <section className="timeline">
       <h2>Revisions</h2>
       {isLoading ? <p className="muted">Loading revisions…</p> : null}
-      {error ? <p className="error-text">{error.message}</p> : null}
+      {/* A read failure (e.g. the page was just deleted) is not an error to shout about. */}
+      {error ? <p className="muted">Revisions unavailable.</p> : null}
       {rollback.isError ? (
         <p className="error-text">{(rollback.error as Error).message}</p>
       ) : null}

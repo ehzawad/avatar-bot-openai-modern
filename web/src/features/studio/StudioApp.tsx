@@ -105,6 +105,13 @@ export function StudioApp() {
     setActiveId(firstActive.id);
   }, [cards, activeId]);
 
+  // If the active page vanished (deleted here or elsewhere, or a stale selection after the
+  // store was reset), drop the selection and fall back to the empty state — never surface a
+  // raw "dataset … not found" error to the user.
+  useEffect(() => {
+    if (activeId && detailQuery.isError) setActiveId(null);
+  }, [activeId, detailQuery.isError]);
+
   const activeCard = useMemo(
     () => cards.find((c) => c.id === activeId) ?? null,
     [cards, activeId],
@@ -233,17 +240,15 @@ export function StudioApp() {
 
   const onDelete = useCallback(
     (datasetId: string) => {
+      // Clear the selection FIRST so the deleted page's detail/revisions queries unmount
+      // before the delete invalidation runs — no stale refetch, no 404 flash.
+      if (activeIdRef.current === datasetId) setActiveId(null);
       deleteDataset.mutate(
         { datasetId },
-        {
-          onSuccess: () => {
-            if (activeId === datasetId) setActiveId(null);
-            pushToast('Page deleted');
-          },
-        },
+        { onSuccess: () => pushToast('Page deleted') },
       );
     },
-    [deleteDataset, activeId, pushToast],
+    [deleteDataset, pushToast],
   );
 
   // Download with unreviewed warning.
@@ -352,7 +357,6 @@ export function StudioApp() {
 
           <div className="app-col app-col--center">
             {detailQuery.isLoading && activeId ? <p className="muted">Loading page…</p> : null}
-            {detailQuery.error ? <p className="error-text">{detailQuery.error.message}</p> : null}
             {detail ? (
               <>
                 <div className="editor-toolbar">
@@ -382,10 +386,10 @@ export function StudioApp() {
           </div>
 
           <div className="app-col app-col--right">
-            {activeId ? (
+            {activeId && activeCard ? (
               <RollbackTimeline
                 datasetId={activeId}
-                currentRevisionId={activeCard?.current_revision_id ?? null}
+                currentRevisionId={activeCard.current_revision_id ?? null}
               />
             ) : null}
           </div>

@@ -211,9 +211,12 @@ export function useDeleteDataset() {
   const qc = useQueryClient();
   return useMutation<void, Error, { datasetId: string }>({
     mutationFn: ({ datasetId }) => api.deleteDataset(datasetId),
-    onSuccess: (_result, { datasetId }) => {
+    onSuccess: () => {
+      // Only refresh the list. Do NOT removeQueries(['dataset', id]) here: if that detail/
+      // revisions observer is still briefly mounted, removeQueries forces a refetch of the
+      // now-deleted id -> a 404. StudioApp clears the active selection on delete, which
+      // unmounts those observers; the stale cache is harmless and gets GC'd.
       void qc.invalidateQueries({ queryKey: queryKeys.datasets() });
-      void qc.removeQueries({ queryKey: queryKeys.dataset(datasetId) });
     },
   });
 }
