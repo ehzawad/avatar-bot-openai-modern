@@ -48,7 +48,7 @@ bundle and the `/studio` chunk never pull Three.
 > .venv/bin/uvicorn app.main:app ...
 > uv run uvicorn app.main:app ...     # if you use uv
 > ```
-> First-time setup (creates `.venv` and installs deps): `./scripts/run-dev.sh`, or
+> First-time setup (creates `.venv` and installs deps): `./scripts/run.sh`, or
 > `uv venv && uv pip install -r requirements.txt`. Also set `OPENAI_API_KEY` before starting.
 > Only the **backend** needs the venv; the `web/` frontend is Node, not Python.
 
