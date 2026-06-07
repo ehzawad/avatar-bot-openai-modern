@@ -17,7 +17,7 @@ async def transcribe_audio(
 ) -> TranscriptionResponse:
     try:
         data = await audio.read()
-        text = await openai.transcribe(audio_bytes=data, filename=audio.filename or "recording.webm", content_type=audio.content_type)
-        return TranscriptionResponse(text=text)
+        result = await openai.transcribe(audio_bytes=data, filename=audio.filename or "recording.webm", content_type=audio.content_type)
+        return TranscriptionResponse(text=str(result.get("text", "")).strip())
     except OpenAIServiceError as exc:
         raise as_http_error(exc) from exc

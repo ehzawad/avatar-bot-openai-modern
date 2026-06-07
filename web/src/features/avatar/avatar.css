@@ -1,0 +1,396 @@
+/* Avatar page styles. ALL selectors namespaced under .avatar-app (WEB_CONTRACT §9).
+ * Ports frontend/assets/css/styles.css; uses local CSS variables so the avatar's
+ * glassy/glow palette is preserved regardless of the shared base.css tokens. */
+
+.avatar-app {
+  --av-bg: #070711;
+  --av-panel: rgba(15, 17, 35, 0.72);
+  --av-border: rgba(255, 255, 255, 0.1);
+  --av-text: #f5f7ff;
+  --av-muted: #99a3c7;
+  --av-accent: #7c3aed;
+  --av-accent-2: #0ea5e9;
+  --av-good: #22c55e;
+  --av-warn: #f59e0b;
+  --av-bad: #ef4444;
+
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--av-bg);
+  color: var(--av-text);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', sans-serif;
+}
+
+.avatar-app *,
+.avatar-app *::before,
+.avatar-app *::after {
+  box-sizing: border-box;
+}
+
+.avatar-app button,
+.avatar-app input,
+.avatar-app select {
+  font: inherit;
+}
+
+.avatar-app .canvas-root {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+}
+.avatar-app .canvas-root canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.avatar-app .glow {
+  position: fixed;
+  width: 46rem;
+  height: 46rem;
+  border-radius: 999px;
+  filter: blur(130px);
+  opacity: 0.18;
+  z-index: 0;
+  pointer-events: none;
+}
+.avatar-app .glow-a {
+  background: var(--av-accent);
+  top: -18rem;
+  left: -16rem;
+}
+.avatar-app .glow-b {
+  background: var(--av-accent-2);
+  bottom: -20rem;
+  right: -12rem;
+}
+
+.avatar-app .panel {
+  background: var(--av-panel);
+  border: 1px solid var(--av-border);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.36);
+  backdrop-filter: blur(18px) saturate(135%);
+  border-radius: 22px;
+}
+
+.avatar-app .topbar {
+  position: fixed;
+  z-index: 10;
+  top: 20px;
+  left: 20px;
+  right: 20px;
+  min-height: 74px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 22px;
+}
+.avatar-app .topbar-right {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.avatar-app .nav-link {
+  color: var(--av-muted);
+  text-decoration: none;
+  border: 1px solid var(--av-border);
+  border-radius: 999px;
+  padding: 0.45rem 0.75rem;
+  background: rgba(255, 255, 255, 0.04);
+  transition: color 140ms ease, border-color 140ms ease;
+}
+.avatar-app .nav-link:hover {
+  color: var(--av-text);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.avatar-app .eyebrow {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--av-muted);
+}
+.avatar-app h1 {
+  margin: 0.1rem 0 0;
+  font-size: 1.5rem;
+  letter-spacing: -0.03em;
+}
+
+.avatar-app .status-pill {
+  display: inline-flex;
+  gap: 0.55rem;
+  align-items: center;
+  color: var(--av-muted);
+  border: 1px solid var(--av-border);
+  border-radius: 999px;
+  padding: 0.45rem 0.75rem;
+  background: rgba(255, 255, 255, 0.04);
+}
+.avatar-app .dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--av-muted);
+  display: inline-block;
+}
+.avatar-app .dot.ready {
+  background: var(--av-good);
+  box-shadow: 0 0 16px var(--av-good);
+}
+.avatar-app .dot.busy {
+  background: var(--av-warn);
+  box-shadow: 0 0 16px var(--av-warn);
+}
+.avatar-app .dot.error {
+  background: var(--av-bad);
+  box-shadow: 0 0 16px var(--av-bad);
+}
+.avatar-app .dot.speaking {
+  background: var(--av-accent-2);
+  box-shadow: 0 0 16px var(--av-accent-2);
+}
+
+.avatar-app .side-stack {
+  position: fixed;
+  z-index: 10;
+  top: 114px;
+  left: 20px;
+  width: min(390px, calc(100vw - 40px));
+  bottom: 116px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  pointer-events: none;
+}
+.avatar-app .side-stack > * {
+  pointer-events: auto;
+}
+
+.avatar-app .chat-panel {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.avatar-app .config-panel {
+  padding: 16px;
+}
+.avatar-app .panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  font-weight: 700;
+  color: #e8ecff;
+  border-bottom: 1px solid var(--av-border);
+}
+.avatar-app .config-panel .panel-title {
+  padding: 0 0 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--av-border);
+}
+
+.avatar-app .messages {
+  padding: 18px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.avatar-app .message {
+  max-width: 94%;
+}
+.avatar-app .message.user {
+  margin-left: auto;
+  text-align: right;
+}
+.avatar-app .message.assistant {
+  margin-right: auto;
+}
+.avatar-app .message.system {
+  margin-right: auto;
+  opacity: 0.92;
+}
+.avatar-app .label {
+  color: var(--av-muted);
+  font-size: 0.75rem;
+  margin-bottom: 5px;
+}
+.avatar-app .bubble {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 11px 13px;
+  border-radius: 16px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+.avatar-app .user .bubble {
+  background: rgba(124, 58, 237, 0.26);
+}
+.avatar-app .assistant .bubble {
+  background: rgba(14, 165, 233, 0.13);
+}
+.avatar-app .system .bubble {
+  color: var(--av-muted);
+  font-size: 0.92rem;
+}
+
+.avatar-app .runtime-grid {
+  display: grid;
+  grid-template-columns: 76px 1fr;
+  gap: 9px 12px;
+  margin: 0 0 14px;
+  color: var(--av-muted);
+  font-size: 0.88rem;
+}
+.avatar-app .runtime-grid dt {
+  color: #d6dcff;
+}
+.avatar-app .runtime-grid dd {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.avatar-app select,
+.avatar-app input[type='text'] {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--av-text);
+  border: 1px solid var(--av-border);
+  border-radius: 12px;
+  outline: none;
+}
+.avatar-app select {
+  width: 100%;
+  padding: 6px 8px;
+}
+.avatar-app .file-label {
+  display: block;
+  text-align: center;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  color: #d9e2ff;
+  border-radius: 14px;
+  padding: 11px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.035);
+}
+.avatar-app .file-label input {
+  display: none;
+}
+
+.avatar-app .composer {
+  position: fixed;
+  z-index: 10;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 22px;
+  width: min(840px, calc(100vw - 40px));
+  display: grid;
+  grid-template-columns: 52px 74px 1fr 92px;
+  align-items: center;
+  gap: 10px;
+  padding: 11px;
+}
+.avatar-app .composer input {
+  height: 48px;
+  padding: 0 16px;
+}
+.avatar-app .round-button,
+.avatar-app .send-button,
+.avatar-app .ghost-button,
+.avatar-app .live-button {
+  cursor: pointer;
+  border: 1px solid var(--av-border);
+  color: var(--av-text);
+  background: rgba(255, 255, 255, 0.07);
+  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+.avatar-app .round-button {
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  color: var(--av-accent-2);
+}
+.avatar-app .round-button.recording {
+  color: #fff;
+  background: rgba(239, 68, 68, 0.5);
+  border-color: rgba(239, 68, 68, 0.8);
+  animation: avatar-pulse 1s infinite;
+}
+.avatar-app .live-button {
+  height: 48px;
+  border-radius: 14px;
+  color: #dbeafe;
+  font-weight: 700;
+}
+.avatar-app .live-button.active {
+  color: #031923;
+  background: #67e8f9;
+  border-color: rgba(103, 232, 249, 0.9);
+  box-shadow: 0 0 22px rgba(103, 232, 249, 0.28);
+}
+.avatar-app .send-button {
+  height: 48px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--av-accent), var(--av-accent-2));
+  border: 0;
+  font-weight: 700;
+}
+.avatar-app .ghost-button {
+  border-radius: 999px;
+  padding: 5px 10px;
+  color: var(--av-muted);
+}
+.avatar-app button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+.avatar-app button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+@keyframes avatar-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+@media (max-width: 780px) {
+  .avatar-app .topbar {
+    min-height: 66px;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .avatar-app .topbar-right {
+    justify-content: flex-start;
+  }
+  .avatar-app .side-stack {
+    top: 142px;
+    bottom: 104px;
+    width: calc(100vw - 40px);
+  }
+  .avatar-app .config-panel {
+    display: none;
+  }
+  .avatar-app .composer {
+    grid-template-columns: 48px 64px 1fr 76px;
+    gap: 8px;
+  }
+  .avatar-app .live-button {
+    padding: 0 8px;
+  }
+}

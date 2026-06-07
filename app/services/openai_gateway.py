@@ -130,34 +130,95 @@ class OpenAIGateway:
             raise self._provider_error("OpenAI speech request failed.", response)
         return response.content
 
-    async def transcribe(self, *, audio_bytes: bytes, filename: str, content_type: str | None) -> str:
+    async def transcribe(
+        self,
+        *,
+        audio_bytes: bytes,
+        filename: str,
+        content_type: str | None,
+        model: str | None = None,
+        language: str | None = None,
+        prompt: str | None = None,
+        response_format: str = "json",
+        extra_fields: dict[str, str] | None = None,
+    ) -> dict:
+        """Transcribe audio and return the parsed provider JSON dict.
+
+        Backward compatible: callers that omit the new keyword arguments get a dict whose
+        ``["text"]`` key holds the transcript text (the legacy ``/api/speech`` route reads that).
+        New callers can read ``result.get("logprobs")`` or segments as well.
+
+        Behavior per contract:
+          - ``language="auto"`` omits the ``language`` field entirely.
+          - Always sends ``temperature=0`` (unless overridden via ``extra_fields``).
+          - On a 4xx that mentions ``language``, retry once without the language field.
+          - ``extra_fields`` values may be a string (single field) or a list of strings
+            (emitted as a repeated multipart form field, e.g. ``include[]`` / ``timestamp_granularities[]``).
+        """
         if not audio_bytes:
             raise OpenAIServiceError("No audio was uploaded.", status.HTTP_400_BAD_REQUEST)
         if len(audio_bytes) > self.settings.max_upload_bytes:
             raise OpenAIServiceError("Uploaded audio is larger than the configured limit.", status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
-
-        files = {
-            "file": (filename or "recording.webm", audio_bytes, content_type or "audio/webm"),
-        }
-        data = {
-            "model": self.settings.openai_transcribe_model,
-            "response_format": "json",
-        }
-        headers = {"Authorization": f"Bearer {self.settings.openai_api_key}"}
         if not self.settings.openai_enabled:
             raise OpenAIServiceError(
                 "OPENAI_API_KEY is not set. Export it in your shell before starting the app.",
                 status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
-        response = await self._client.post("/audio/transcriptions", headers=headers, data=data, files=files)
+        headers = {"Authorization": f"Bearer {self.settings.openai_api_key}"}
+
+        def build_data(include_language: bool) -> dict[str, Any]:
+            # httpx only encodes multipart form fields when ``data`` is a Mapping (dict).
+            # A list-of-tuples is mis-encoded as a sync-only body stream, which an AsyncClient
+            # rejects. Repeated keys (include[], timestamp_granularities[]) are expressed as a
+            # list VALUE on the dict, which httpx expands into repeated multipart fields.
+            fields: dict[str, Any] = {
+                "model": model or self.settings.openai_transcribe_model,
+                "response_format": response_format,
+                "temperature": "0",
+            }
+            if include_language and language and language.lower() != "auto":
+                fields["language"] = language
+            if prompt:
+                fields["prompt"] = prompt
+            for key, value in (extra_fields or {}).items():
+                if isinstance(value, (list, tuple)):
+                    fields[key] = [str(item) for item in value]
+                else:
+                    fields[key] = str(value)
+            return fields
+
+        files = {"file": (filename or "recording.webm", audio_bytes, content_type or "audio/webm")}
+
+        async def do_post(include_language: bool) -> httpx.Response:
+            return await self._client.post(
+                "/audio/transcriptions",
+                headers=headers,
+                data=build_data(include_language),
+                files=files,
+            )
+
+        include_language = bool(language and language.lower() != "auto")
+        response = await do_post(include_language)
+
+        if response.status_code >= 400 and include_language and 400 <= response.status_code < 500:
+            # Retry once without the language field if the provider complained about language.
+            body = response.text.lower()
+            if "language" in body:
+                response = await do_post(include_language=False)
+
         if response.status_code >= 400:
             raise self._provider_error("OpenAI transcription request failed.", response)
+
         try:
             payload = response.json()
         except ValueError:
-            return response.text.strip()
-        return str(payload.get("text", "")).strip()
+            return {"text": response.text.strip()}
+        if not isinstance(payload, dict):
+            return {"text": str(payload).strip()}
+        if "text" in payload and isinstance(payload["text"], str):
+            payload["text"] = payload["text"].strip()
+        return payload
 
     async def _post_json(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         response = await self._client.post(path, headers=self._headers(), json=payload)

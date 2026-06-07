@@ -1,5 +1,10 @@
 # Architecture
 
+> **Frontend note (updated):** the browser layer is now a single unified Vite + React + TypeScript
+> app in `web/` (landing at `/`, avatar at `/avatar`, Bengali eval studio at `/studio`), served by FastAPI from
+> `web/dist`. The legacy `frontend/` and `studio-web/` dirs were retired; see
+> [WEB_ARCHITECTURE.md](WEB_ARCHITECTURE.md) for the fuller frontend map.
+
 For visual system maps, request flow diagrams, state machines, and security boundaries, see [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md).
 
 ## Backend modules
@@ -18,15 +23,19 @@ For visual system maps, request flow diagrams, state machines, and security boun
 
 ## Frontend modules
 
-`frontend/src/api/client.js` owns backend HTTP calls.
+`web/src/router.tsx` owns the client route table: eager Home at `/`, lazy Avatar at `/avatar`,
+and lazy Studio at `/studio/*`.
 
-`frontend/src/avatar/*` owns Three.js, VRM/GLB loading, expressions, gestures, idle animation, blinking, and lip-sync.
+`web/src/features/home/*` owns the lightweight landing page and imports no avatar feature code.
 
-`frontend/src/audio/*` owns microphone recording and audio playback/analyser logic.
+`web/src/features/avatar/*` owns Three.js, VRM/GLB loading, expressions, gestures, idle animation,
+blinking, lip-sync, the avatar chat state machine, and avatar-specific UI.
 
-`frontend/src/ui/*` owns DOM manipulation.
+`web/src/features/studio/*` owns the Bengali Eval Studio shell, recording/editing components,
+pending captures, local draft undo, and studio-specific UI.
 
-`frontend/src/app.js` is composition glue only.
+`web/src/lib/*` owns shared API clients, TanStack Query hooks, shared recorder logic, and small
+cross-feature helpers. It must stay free of Three.js imports.
 
 ## Key design decisions
 

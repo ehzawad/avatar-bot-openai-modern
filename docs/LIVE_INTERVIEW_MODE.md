@@ -1,5 +1,9 @@
 # Live Interview Mode
 
+> **Frontend note (updated):** live mode now lives in the unified `web/` app under `/avatar`
+> (`web/src/features/avatar/hooks/useAvatarChat.ts` — a reducer state machine with turn-token /
+> AbortController / live-epoch guards). The runtime behavior and tuning points still apply.
+
 For a visual sequence diagram and state machine, see [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md).
 
 Live interview mode makes Aria feel closer to a human interviewer or live support agent without exposing the OpenAI API key to the browser.
@@ -18,7 +22,8 @@ Live interview mode makes Aria feel closer to a human interviewer or live suppor
 
 ## Turn-Taking Settings
 
-The browser owns pause detection in `frontend/src/audio/recorder.js` and `frontend/src/app.js`.
+The browser owns pause detection in `web/src/lib/audio/useRecorder.ts`, driven by
+`web/src/features/avatar/hooks/useAvatarChat.ts`.
 
 - `speechThreshold`: microphone RMS level needed to count as speech.
 - `silenceMs`: pause duration before a live turn is submitted.

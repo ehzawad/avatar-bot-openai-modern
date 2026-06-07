@@ -4,7 +4,14 @@ from fastapi import APIRouter, Depends
 
 from app.api.dependencies import settings
 from app.core.config import Settings
-from app.domain.schemas import Emotion, Gesture, HealthResponse, PublicConfig
+from app.domain.schemas import (
+    Emotion,
+    Gesture,
+    HealthResponse,
+    PublicConfig,
+    SttPrompt,
+    TranscribeTier,
+)
 
 router = APIRouter(tags=["system"])
 
@@ -30,4 +37,11 @@ async def public_config(cfg: Settings = Depends(settings)) -> PublicConfig:
         voices=["alloy", "ash", "ballad", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer", "verse", "marin", "cedar"],
         emotions=[e.value for e in Emotion],
         gestures=[g.value for g in Gesture],
+        transcribe_tiers=[
+            TranscribeTier(id="fast", label="Fast", model=cfg.openai_transcribe_model_fast),
+            TranscribeTier(id="best", label="Best", model=cfg.openai_transcribe_model_best),
+        ],
+        stt_prompts=[SttPrompt(id="bn-codeswitch-v1", label="Bengali code-switch v1")],
+        languages=["bn", "auto", "en"],
+        dataset_page_size_default=cfg.dataset_page_size_default,
     )

@@ -1,5 +1,9 @@
 # System Design Diagrams
 
+> **Frontend note (updated):** browser code is now one unified Vite + React + TS app in `web/`
+> (landing `/`, avatar `/avatar`, studio `/studio`), served from `web/dist`. `frontend/`-prefixed file paths in the
+> diagrams are historical; see [WEB_ARCHITECTURE.md](WEB_ARCHITECTURE.md). Backend flows are current.
+
 This document is the visual map for Aria. It uses plain ASCII diagrams for quick terminal reading and Mermaid diagrams for renderable views on GitHub and other Markdown viewers.
 
 ## Mental Model
@@ -46,9 +50,10 @@ Process: python -m uvicorn app.main:app --reload
 
 127.0.0.1:8000
 |
-+-- GET  /                         -> frontend/index.html
-+-- GET  /src/*                    -> frontend modules
-+-- GET  /assets/*                 -> CSS/assets
++-- GET  /                         -> web/dist index.html (landing route)
++-- GET  /avatar                   -> web/dist index.html (avatar route)
++-- GET  /studio                   -> web/dist index.html (studio route)
++-- GET  /assets/*                 -> built CSS/JS/assets
 +-- GET  /api/health               -> config health
 +-- GET  /api/config               -> public runtime config
 +-- POST /api/conversations        -> create local session
@@ -62,14 +67,14 @@ Process: python -m uvicorn app.main:app --reload
 flowchart TB
   subgraph uvicorn[Uvicorn process]
     appmain[app.main:create_app]
-    static[StaticFiles frontend/]
+    static[StaticFiles web/dist]
     api[API router /api]
     state[app.state\nsettings, session_store, openai_gateway, avatar_service]
   end
 
   browser[Browser]
-  browser -->|GET /| static
-  browser -->|GET /src/* /assets/*| static
+  browser -->|GET / /avatar /studio| static
+  browser -->|GET /assets/*| static
   browser -->|GET/POST /api/*| api
   appmain --> static
   appmain --> api
@@ -78,56 +83,51 @@ flowchart TB
 
 ## Frontend Module Map
 
-The browser side is split by responsibility. `frontend/src/app.js` composes everything but does not own rendering, API details, or audio internals.
+The browser side is the unified `web/` React app. The home page is eager and lightweight; the
+avatar and studio routes are lazy tool surfaces over a shared, Three-free `lib/` layer.
 
 ```text
-frontend/src/app.js
+web/src/main.tsx
 |
-+-- api/client.js
-|     owns fetch calls to FastAPI
++-- router.tsx
+|     owns / (home), /avatar (lazy), and /studio/* (lazy)
 |
-+-- core/state.js
-|     owns conversation id, selected voice, busy, live mode
++-- features/home/*
+|     owns the lightweight landing page; imports no avatar feature code
 |
-+-- ui/dom.js + ui/chatView.js
-|     owns DOM references and visible UI updates
++-- features/avatar/*
+|     owns Three.js, VRM/GLB loading, expressions, gestures, idle animation,
+|     lip-sync, avatar chat state, audio playback, and avatar UI
 |
-+-- audio/recorder.js
-|     owns microphone capture, RMS level, silence pause detection
++-- features/studio/*
+|     owns dataset recording, editing, pending captures, rollback, exports,
+|     and studio UI
 |
-+-- audio/player.js
-|     owns TTS playback and analyser output for mouth movement
-|
-+-- avatar/avatarScene.js
-      owns Three.js scene, camera, gestures, idle animation
-      |
-      +-- avatar/modelLoader.js
-      +-- avatar/expressionController.js
++-- lib/*
+      owns root-relative API clients, TanStack Query hooks, shared recorder logic,
+      shared types, and small helpers; no Three imports
 ```
 
 ```mermaid
 flowchart LR
-  appjs[app.js\ncomposition glue]
-  api[api/client.js]
-  state[core/state.js]
-  dom[ui/dom.js]
-  view[ui/chatView.js]
-  recorder[audio/recorder.js]
-  player[audio/player.js]
-  scene[avatar/avatarScene.js]
-  loader[avatar/modelLoader.js]
-  expressions[avatar/expressionController.js]
+  main[main.tsx\nproviders]
+  router[router.tsx\n/, /avatar, /studio/*]
+  home[features/home\nlanding]
+  avatar[features/avatar\nAvatarApp + scene]
+  studio[features/studio\nStudioApp + editor]
+  lib[lib\nAPI, types, recorder]
+  scene[AvatarRuntime\nThree.js engine]
+  chat[useAvatarChat\nturn state]
 
-  appjs --> api
-  appjs --> state
-  appjs --> dom
-  appjs --> view
-  appjs --> recorder
-  appjs --> player
-  appjs --> scene
-  scene --> loader
-  scene --> expressions
-  scene --> player
+  main --> router
+  router --> home
+  router -. lazy .-> avatar
+  router -. lazy .-> studio
+  avatar --> lib
+  avatar --> scene
+  avatar --> chat
+  studio --> lib
+  chat --> lib
 ```
 
 ## Backend Module Map
@@ -601,10 +601,10 @@ These values live in the browser because pause detection depends on the user's m
 
 | Setting | Owner | Meaning |
 | --- | --- | --- |
-| `speechThreshold` | `frontend/src/app.js` -> `MicRecorder` | RMS level that counts as active speech. |
-| `silenceMs` | `frontend/src/app.js` -> `MicRecorder` | Silence duration after speech before the turn is submitted. |
-| `minSpeechMs` | `frontend/src/app.js` -> `MicRecorder` | Minimum speech duration before silence can stop recording. |
-| `idleTimeoutMs` | `frontend/src/app.js` -> `MicRecorder` | No-speech timeout that resets live listening without sending audio. |
+| `speechThreshold` | `web/src/lib/audio/useRecorder.ts` via `useAvatarChat` | RMS level that counts as active speech. |
+| `silenceMs` | `web/src/lib/audio/useRecorder.ts` via `useAvatarChat` | Silence duration after speech before the turn is submitted. |
+| `minSpeechMs` | `web/src/lib/audio/useRecorder.ts` via `useAvatarChat` | Minimum speech duration before silence can stop recording. |
+| `idleTimeoutMs` | `web/src/lib/audio/useRecorder.ts` via `useAvatarChat` | No-speech timeout that resets live listening without sending audio. |
 | `max_tts_chars` | `app/core/config.py` | Backend cap before sending text to TTS. |
 | `session_ttl_seconds` | `app/core/config.py` | In-memory session lifetime. |
 
@@ -640,4 +640,3 @@ flowchart LR
   current --> deploy
   current --> realtime
 ```
-
