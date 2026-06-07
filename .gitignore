@@ -7,3 +7,6 @@ __pycache__/
 .playwright-cli/
 frontend/models/*.vrm
 frontend/models/*.glb
+data/
+studio-web/node_modules/
+studio-web/dist/

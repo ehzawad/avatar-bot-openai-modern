@@ -87,6 +87,17 @@ class HealthResponse(BaseModel):
     transcribe_model: str
 
 
+class TranscribeTier(BaseModel):
+    id: str
+    label: str
+    model: str
+
+
+class SttPrompt(BaseModel):
+    id: str
+    label: str
+
+
 class PublicConfig(BaseModel):
     response_model: str
     tts_model: str
@@ -95,6 +106,10 @@ class PublicConfig(BaseModel):
     voices: list[str]
     emotions: list[str]
     gestures: list[str]
+    transcribe_tiers: list[TranscribeTier] = Field(default_factory=list)
+    stt_prompts: list[SttPrompt] = Field(default_factory=list)
+    languages: list[str] = Field(default_factory=list)
+    dataset_page_size_default: int = 50
 
 
 class TranscriptionResponse(BaseModel):
