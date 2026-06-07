@@ -53,6 +53,17 @@ under `web/src/features/avatar/**` and is lazy-loaded, so the `/studio` chunk ne
 Set `OPENAI_API_KEY` before starting (export it, or copy `.env.example` to `.env` and set it
 there — the dev script and the app read the same runtime settings).
 
+### Quickest start — one command
+
+```zsh
+./scripts/run.sh          # creates .venv + installs deps, builds web/, serves ONE process
+                          #   avatar -> http://127.0.0.1:8000/    studio -> /studio
+./scripts/run.sh dev      # hot-reload: backend + Vite dev server together (open the Vite URL)
+```
+
+`SKIP_BUILD=1 ./scripts/run.sh` reuses an existing `web/dist` (skips the rebuild); `HOST`/`PORT`
+override the bind address. The script always uses `.venv`, so you never hit `No module named uvicorn`.
+
 ### Dev — two terminals (Vite dev server + proxy)
 
 ```zsh
