@@ -20,9 +20,14 @@ export interface GestureEvent {
   type: Gesture;
 }
 
+export interface EmotionEvent {
+  id: string;
+  type: Emotion;
+}
+
 export interface UseAvatarSceneArgs {
   getMouthLevel: () => number;
-  emotion: Emotion | null;
+  emotionEvent: EmotionEvent | null;
   gestureEvent: GestureEvent | null;
   modelUrl: string | null;
 }
@@ -34,7 +39,7 @@ export interface UseAvatarSceneResult {
 
 export function useAvatarScene(
   containerRef: RefObject<HTMLElement | null>,
-  { getMouthLevel, emotion, gestureEvent, modelUrl }: UseAvatarSceneArgs,
+  { getMouthLevel, emotionEvent, gestureEvent, modelUrl }: UseAvatarSceneArgs,
 ): UseAvatarSceneResult {
   const runtimeRef = useRef<AvatarRuntime | null>(null);
   // Keep mouth-level reader fresh without re-initialising the runtime.
@@ -60,11 +65,15 @@ export function useAvatarScene(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // --- durable: emotion ----------------------------------------------------
+  // --- event: emotion (keyed on id) ----------------------------------------
+  // Emotion is an EVENT, not durable state: the runtime auto-resets to neutral after
+  // ~4.8s, so a second identical reply emotion (e.g. "joy" again) must re-fire. Keying
+  // on the event id makes repeated identical emotions re-trigger.
   useEffect(() => {
-    if (emotion == null) return;
-    runtimeRef.current?.setEmotion(emotion);
-  }, [emotion]);
+    if (!emotionEvent) return;
+    runtimeRef.current?.setEmotion(emotionEvent.type);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [emotionEvent?.id]);
 
   // --- durable: modelUrl (null => fallback) --------------------------------
   // init() already installs the fallback, so the very first null pass is a no-op;

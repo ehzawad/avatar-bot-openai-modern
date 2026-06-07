@@ -14,7 +14,7 @@ import { useRecorder } from '../../lib/audio/useRecorder';
 
 import { AudioPlayer } from './audio/AudioPlayer';
 import { useAvatarChat, type StatusTone } from './hooks/useAvatarChat';
-import { useAvatarScene, type GestureEvent } from './scene/useAvatarScene';
+import { useAvatarScene, type GestureEvent, type EmotionEvent } from './scene/useAvatarScene';
 import { ChatView } from './components/ChatView';
 import { Composer } from './components/Composer';
 import { RuntimePanel } from './components/RuntimePanel';
@@ -48,15 +48,18 @@ export default function AvatarApp() {
   const config = configQuery.data ?? null;
   const defaultVoice = config?.default_voice ?? '';
 
-  // --- scene cues: emotion (durable) + gesture (event) -------------------
-  const [emotion, setEmotion] = useState<Emotion | null>(null);
+  // --- scene cues: emotion + gesture are both EVENTS ---------------------
+  // (the runtime auto-resets emotion after ~4.8s, so a repeated identical emotion must
+  // re-fire — hence an event with a fresh id per reply, not gated durable state).
+  const [emotionEvent, setEmotionEvent] = useState<EmotionEvent | null>(null);
   const [gestureEvent, setGestureEvent] = useState<GestureEvent | null>(null);
-  const gestureSeqRef = useRef(0);
+  const cueSeqRef = useRef(0);
 
   const onAvatarCue = useCallback((cue: { emotion: Emotion; gesture: Gesture }) => {
-    setEmotion(cue.emotion);
-    gestureSeqRef.current += 1;
-    setGestureEvent({ id: `g${gestureSeqRef.current}`, type: cue.gesture });
+    cueSeqRef.current += 1;
+    const id = `c${cueSeqRef.current}`;
+    setEmotionEvent({ id, type: cue.emotion });
+    setGestureEvent({ id, type: cue.gesture });
   }, []);
 
   const chat = useAvatarChat({
@@ -70,7 +73,7 @@ export default function AvatarApp() {
   const getMouthLevel = useCallback(() => audioPlayer.getMouthLevel(), [audioPlayer]);
   const { loadUploadedFile } = useAvatarScene(canvasRef, {
     getMouthLevel,
-    emotion,
+    emotionEvent,
     gestureEvent,
     modelUrl: null, // uploads go through loadUploadedFile; null => procedural fallback
   });

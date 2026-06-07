@@ -1,5 +1,9 @@
 # System Design Diagrams
 
+> **Frontend note (updated):** browser code is now one unified Vite + React + TS app in `web/`
+> (avatar `/`, studio `/studio`), served from `web/dist`. `frontend/`-prefixed file paths in the
+> diagrams are historical; see [WEB_ARCHITECTURE.md](WEB_ARCHITECTURE.md). Backend flows are current.
+
 This document is the visual map for Aria. It uses plain ASCII diagrams for quick terminal reading and Mermaid diagrams for renderable views on GitHub and other Markdown viewers.
 
 ## Mental Model

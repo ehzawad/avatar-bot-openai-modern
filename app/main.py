@@ -66,7 +66,7 @@ def create_app() -> FastAPI:
             candidate = (WEB_DIST / path).resolve()
             if path and candidate.is_file() and candidate.is_relative_to(WEB_DIST):
                 return FileResponse(candidate)
-            if path.startswith("api/") or "." in Path(path).name:
+            if path == "api" or path.startswith("api/") or "." in Path(path).name:
                 raise HTTPException(status_code=404)
             return FileResponse(
                 WEB_DIST / "index.html",

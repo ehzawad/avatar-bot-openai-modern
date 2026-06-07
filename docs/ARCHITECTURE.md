@@ -1,5 +1,10 @@
 # Architecture
 
+> **Frontend note (updated):** the browser layer is now a single unified Vite + React + TypeScript
+> app in `web/` (avatar at `/`, Bengali eval studio at `/studio`), served by FastAPI from
+> `web/dist`. Any `frontend/src/...` / `studio-web/...` paths below are **historical** (those dirs
+> were retired) — see [WEB_ARCHITECTURE.md](WEB_ARCHITECTURE.md). The backend description is current.
+
 For visual system maps, request flow diagrams, state machines, and security boundaries, see [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md).
 
 ## Backend modules

@@ -427,13 +427,11 @@ export function useAvatarChat({
         endTurn(turn);
         dispatch({ type: 'phase', phase: 'idle' });
 
-        // Live loop: only continue if audio ENDED naturally (not stopped) and we're
-        // still in the same live epoch.
-        if (
-          playback === 'ended' &&
-          liveModeRef.current &&
-          turn.liveEpoch === liveEpochRef.current
-        ) {
+        // Live loop: continue if audio ENDED naturally (not stopped) and Live is currently
+        // on. We gate on liveModeRef (current state), NOT the turn's captured epoch — that
+        // wrongly blocked the case where Live is toggled ON during this reply's playback.
+        // scheduleLiveListening re-validates the current epoch when its timer fires.
+        if (playback === 'ended' && liveModeRef.current) {
           dispatch({ type: 'status', label: 'Listening', tone: 'busy' });
           scheduleLiveListening(250);
         } else {
@@ -457,9 +455,17 @@ export function useAvatarChat({
         // eslint-disable-next-line no-console
         console.error(err);
         addMessage('system', message);
+        // A mic failure must release Live mode (otherwise the toggle stays stuck pressed and
+        // the input stays disabled). Recover phase to 'idle' (with an error-tone status) so
+        // the user can immediately retry by typing — matching the original setBusy(false).
+        if (isMic) {
+          clearLiveTimeout();
+          liveEpochRef.current += 1;
+          dispatch({ type: 'liveMode', value: false });
+        }
         dispatch({
           type: 'phase+status',
-          phase: 'error',
+          phase: 'idle',
           label: isMic ? 'Microphone blocked' : 'Reply failed',
           tone: 'error',
         });
@@ -469,6 +475,7 @@ export function useAvatarChat({
       addMessage,
       audioPlayer,
       beginTurn,
+      clearLiveTimeout,
       endTurn,
       ensureConversation,
       isCurrentTurn,

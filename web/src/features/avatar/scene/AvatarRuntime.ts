@@ -16,7 +16,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { VRMLoaderPlugin } from '@pixiv/three-vrm';
+import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 
 import type { Emotion, Gesture } from '../../../lib/api/types';
 
@@ -277,7 +277,19 @@ class AvatarModelLoader {
       }
     });
 
-    model.scene.rotation.y = nativeVrm ? Math.PI : -Math.PI / 2;
+    // Orientation under @pixiv/three-vrm v3: VRM 1.0 already faces +Z (toward our camera);
+    // VRMUtils.rotateVRM0 rotates ONLY VRM 0.x models 180° so they match. The old
+    // unconditional `rotation.y = Math.PI` was a v2-era hack that left VRM 1.0 back-facing.
+    if (nativeVrm) {
+      try {
+        VRMUtils.rotateVRM0(vrm as Parameters<typeof VRMUtils.rotateVRM0>[0]);
+      } catch {
+        /* non-fatal: leave default orientation */
+      }
+      model.scene.rotation.y = 0;
+    } else {
+      model.scene.rotation.y = -Math.PI / 2; // plain GLB: turn to face the camera
+    }
     model.scene.position.set(0, 0, 0);
     model.scene.scale.setScalar(this.scaleFor(model.scene));
     model.headHeight = 1.45;
@@ -583,7 +595,9 @@ export class AvatarRuntime {
       /* presets already reset to neutral by the controller */
     };
 
-    canvas.addEventListener('pointermove', this.onPointerMove);
+    // Gaze tracks the cursor anywhere in the window (panels sit above the canvas), like the
+    // original window-level mousemove; normalization still uses the canvas rect.
+    window.addEventListener('pointermove', this.onPointerMove);
     canvas.addEventListener('webglcontextlost', this.onContextLost as EventListener, false);
     canvas.addEventListener('webglcontextrestored', this.onContextRestored as EventListener, false);
     document.addEventListener('visibilitychange', this.onVisibilityChange);
@@ -825,7 +839,7 @@ export class AvatarRuntime {
 
     // remove named listeners
     const canvas = this.renderer.domElement;
-    canvas.removeEventListener('pointermove', this.onPointerMove);
+    window.removeEventListener('pointermove', this.onPointerMove);
     canvas.removeEventListener('webglcontextlost', this.onContextLost as EventListener, false);
     canvas.removeEventListener(
       'webglcontextrestored',
