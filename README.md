@@ -13,26 +13,76 @@ The browser owns rendering, audio playback, lip-sync, microphone capture, and UI
 - OpenAI transcription endpoint for browser-recorded voice input.
 - Live interview mode that listens for speech, detects a pause, then replies aloud and resumes listening.
 - Server-side in-memory conversation sessions using `previous_response_id` for continuity.
-- Modular frontend: API client, avatar scene, audio player, recorder, and UI view are separate modules.
+- Unified frontend: a single Vite + React + TypeScript app in `web/` serves **both** the avatar
+  (at `/`) and the Bengali Eval Studio (at `/studio`).
 - Modular backend: routes, domain schemas, application service, session store, and OpenAI adapter are separate modules.
+
+## Unified frontend (`web/`)
+
+There is now **one** frontend app: `web/` (Vite + React + TypeScript). It contains both surfaces
+behind a single React Router, code-split into lazy chunks:
+
+- `/` — the avatar app (Three.js / VRM scene, voice loop, live interview mode).
+- `/studio` — the Bengali Conversational Eval Studio.
+
+FastAPI serves the single built SPA from `web/dist`: API routes are matched first, hashed assets
+are served from `/assets/*`, and any other path falls back to `index.html` so client-side routes
+(including a hard reload of `/studio`) resolve. The Three.js / `@pixiv/three-vrm` code lives only
+under `web/src/features/avatar/**` and is lazy-loaded, so the `/studio` chunk never pulls Three.
+
+> **`frontend/` and `studio-web/` are retired.** They have been replaced by `web/`. The legacy
+> avatar app (`frontend/`) and the standalone studio app (`studio-web/`) are no longer the way to
+> run or build this project; use `web/` for everything. See
+> [docs/WEB_ARCHITECTURE.md](docs/WEB_ARCHITECTURE.md) for the unified frontend design.
 
 ## Run on macOS
 
-```zsh
-cd avatar-bot-openai-modern
+> **Python env note.** `uvicorn` is installed in the project virtualenv at `.venv/`, not in your
+> system Python. Activate the venv (or prefix the binary) before running the backend, otherwise
+> you get `No module named uvicorn`:
+> ```zsh
+> source .venv/bin/activate    # then `uvicorn ...` / `python ...` work directly
+> # — or without activating —
+> .venv/bin/uvicorn app.main:app ...
+> uv run uvicorn app.main:app ...     # if you use uv
+> ```
+> First-time setup (creates `.venv` and installs deps): `./scripts/run-dev.sh`, or
+> `uv venv && uv pip install -r requirements.txt`. Also set `OPENAI_API_KEY` before starting.
+> Only the **backend** needs the venv; the `web/` frontend is Node, not Python.
 
-# If OPENAI_API_KEY is exported from ~/.zshrc, make sure this terminal has loaded it.
-source ~/.zshrc
-./scripts/run-dev.sh
+Set `OPENAI_API_KEY` before starting (export it, or copy `.env.example` to `.env` and set it
+there — the dev script and the app read the same runtime settings).
+
+### Dev — two terminals (Vite dev server + proxy)
+
+```zsh
+# Terminal 1 — backend (Python venv)
+source .venv/bin/activate && uvicorn app.main:app --reload --port 8000
+
+# Terminal 2 — unified frontend (Node; no venv needed)
+cd web && npm install && npm run dev
+```
+
+Open the **Vite** URL it prints (e.g. `http://localhost:5173/`), not port 8000, in dev mode. The
+Vite dev server proxies `/api` to `http://127.0.0.1:8000`, so all API calls stay root-relative.
+`/` is the avatar, `/studio` is the studio.
+
+### Prod — one URL served by FastAPI
+
+```zsh
+# 1. build the unified frontend once (re-run after frontend changes)
+cd web && npm install && npm run build      # tsc -b + vite build, emits web/dist
+
+# 2. run the backend (serves the API AND the built SPA from web/dist)
+source .venv/bin/activate && uvicorn app.main:app --port 8000
 ```
 
 Open:
 
 ```text
-http://127.0.0.1:8000
+http://127.0.0.1:8000/              # the avatar app
+http://127.0.0.1:8000/studio        # the Bengali Eval Studio
 ```
-
-You can also create a local `.env` from `.env.example` and set `OPENAI_API_KEY` there. The dev script and app both read the same runtime settings.
 
 ## Optional model overrides
 
@@ -67,6 +117,12 @@ POST   /api/speech/transcriptions
 
 ## Architecture
 
+The unified `web/` app is a single Vite + React + TS SPA with a React Router that lazy-loads two
+feature areas (`features/avatar`, `features/studio`) over a shared `lib/` boundary (HTTP client,
+TanStack Query hooks, shared recorder). FastAPI serves the one `web/dist` build for all non-API
+routes. See [docs/WEB_ARCHITECTURE.md](docs/WEB_ARCHITECTURE.md) for the full frontend design and
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the backend module map.
+
 ```text
 Browser UI
   -> /api/conversations/{id}/messages
@@ -93,55 +149,15 @@ It is additive to the avatar app: the existing avatar at `/` keeps working, Open
 
 ### How to run
 
-The studio frontend lives in `studio-web/` (React 19 + Vite + TanStack Query + zundo). There are two ways to run it.
+The studio is part of the unified `web/` app and is served at `/studio`. Run it exactly like the
+rest of the app — see [Run on macOS](#run-on-macos) above:
 
-> **Python env note.** `uvicorn` is installed in the project virtualenv at `.venv/`, not in
-> your system Python. Run the backend in one of these ways (otherwise you get
-> `No module named uvicorn`):
-> ```zsh
-> source .venv/bin/activate    # then `uvicorn ...` / `python ...` work directly
-> # — or without activating —
-> .venv/bin/uvicorn app.main:app ...
-> uv run uvicorn app.main:app ...     # if you use uv
-> ```
-> First-time setup (creates `.venv` and installs deps): `./scripts/run-dev.sh`, or
-> `uv venv && uv pip install -r requirements.txt`. Also export `OPENAI_API_KEY` before starting.
-> Only the **backend** (Terminal 1) needs the venv; the frontend (Terminal 2) is Node, not Python.
+- **Dev:** two terminals (backend via `.venv`; `cd web && npm install && npm run dev`), then open
+  the Vite URL at `/studio`.
+- **Prod:** `cd web && npm install && npm run build`, run uvicorn, open
+  `http://127.0.0.1:8000/studio`.
 
-**Live dev (Vite dev server + proxy) — two terminals:**
-
-```zsh
-# Terminal 1 — backend (Python venv)
-source .venv/bin/activate
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-
-# Terminal 2 — studio frontend (Node; no venv needed)
-cd studio-web
-npm install
-npm run dev          # open the URL it prints, e.g. http://localhost:5173/studio/
-```
-
-The Vite dev server proxies `/api` to `http://127.0.0.1:8000`, so all API calls stay root-relative.
-Open the **Vite** URL (port 5173), not 8000, in this mode.
-
-**Built (full app served by FastAPI on one URL):**
-
-```zsh
-# 1. build the studio once (re-run after frontend changes)
-cd studio-web && npm install && npm run build      # tsc + vite, emits studio-web/dist
-cd ..
-
-# 2. run the backend (serves the API AND the built studio)
-source .venv/bin/activate
-uvicorn app.main:app --host 127.0.0.1 --port 8000
-```
-
-When `studio-web/dist` exists, FastAPI mounts it at `/studio` (before the root avatar mount). Open:
-
-```text
-http://127.0.0.1:8000/studio        # the studio
-http://127.0.0.1:8000/              # the original avatar app
-```
+(The standalone `studio-web/` app is retired — it has been folded into `web/`.)
 
 ### Model tiers
 
@@ -149,11 +165,11 @@ Transcription tier is resolved server-side (the backend never trusts a raw model
 
 | tier      | model string             | notes                          |
 |-----------|--------------------------|--------------------------------|
-| `fast`    | `gpt-4o-mini-transcribe` | quick, lower cost              |
-| `best`    | `gpt-4o-transcribe`      | **default** (eval quality)     |
-| `whisper` | `whisper-1`              | segment timestamps             |
+| `fast`    | `gpt-4o-mini-transcribe`   | quick, lower cost              |
+| `best`    | `gpt-4o-transcribe`        | **default** (eval quality, Bengali script) |
+| `diarize` | `gpt-4o-transcribe-diarize`| speaker-aware (multi-speaker); note: no prompt support, so it romanizes Bengali |
 
-Transcription always sends `language` (default `bn`, override `bn | auto | en`), `temperature=0`, and a versioned Bengali prompt (default `bn-codeswitch-v1`). Override the tier model strings via `OPENAI_TRANSCRIBE_MODEL_FAST`, `OPENAI_TRANSCRIBE_MODEL_BEST`, and `OPENAI_TRANSCRIBE_MODEL_WHISPER`.
+`fast`/`best` always send `language` (default `bn`, override `bn | auto | en`), `temperature=0`, a versioned Bengali prompt (default `bn-codeswitch-v1`), and request logprobs for QC. The `diarize` model has a restricted parameter surface (it rejects `prompt`/`include[]`), so it is sent `language` + `temperature` only — great for separating speakers, but it transcribes Bengali in Latin script; prefer `best` for Bengali-script eval text. Override the tier model strings via `OPENAI_TRANSCRIBE_MODEL_FAST`, `OPENAI_TRANSCRIBE_MODEL_BEST`, and `OPENAI_TRANSCRIBE_MODEL_DIARIZE`.
 
 ### Where data lives
 
@@ -162,14 +178,34 @@ The SQLite DB and recorded audio live under `data/` (created at runtime), never 
 - `data/studio.db` — source of truth (series, datasets/pages, lines, revisions, snapshots).
 - `data/audio/` — captured audio (`<sha>.webm`), retained for retry.
 
-`data/` is gitignored (along with `studio-web/node_modules/` and `studio-web/dist/`). Override the location with `DATA_DIR`.
+`data/` is gitignored (along with `web/node_modules/` and `web/dist/`). Override the location with `DATA_DIR`.
+
+### Per-line tag
+
+Each line carries an optional, nullable `tag` (a free-text label, e.g. `greeting`). It is sticky
+in the record bar (the current tag is applied to every capture) and editable per row in the line
+editor. Empty or whitespace-only input is stored as `NULL`. The tag is snapshotted with the line,
+so it survives rollback, and it is the source of the `tagname` column in the CSV export.
 
 ### Downloads
 
-Each page downloads as either:
+Each page downloads as one of:
 
 - **`.txt`** — one line per non-deleted line; `annotated=true` prefixes each line with `[role] `.
 - **`.jsonl`** — grouped by `conversation_key` into `{messages, expected, metadata}` examples. Default `scope=accepted` exports only accepted lines; `scope=all` exports all non-deleted lines.
+- **`.csv`** — a flat `text,tagname` table for spreadsheet/labeling tools.
+
+The CSV is `text/csv; charset=utf-8` with a header row `text,tagname` followed by one row per
+non-deleted line in `line_index` order. It is **RFC-4180 quoted**: every field is wrapped in
+double quotes and any embedded `"` is doubled (`""`); a null tag becomes an empty quoted field
+`""`. UTF-8 (Bengali) text is preserved. `scope` works like the txt/jsonl downloads (`all` is the
+default, `accepted` exports only accepted lines). Example:
+
+```csv
+text,tagname
+"আজ তুমি কেমন আছো?","greeting"
+"আমি ভালো আছি, ""সত্যিই""।",""
+```
 
 ## Production notes
 

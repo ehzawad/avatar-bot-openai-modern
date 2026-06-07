@@ -1,0 +1,518 @@
+/* All studio styles are namespaced under .studio-app so nothing leaks to the
+ * avatar route. Shared tokens (CSS vars) come from styles/base.css.
+ */
+
+.studio-app {
+  --bn-font: 'Noto Sans Bengali', 'Hind Siliguri', 'Kohinoor Bangla', 'Bangla MN',
+    'Nirmala UI', 'Vrinda', system-ui, sans-serif;
+  color: var(--text);
+}
+
+.studio-app .bn {
+  font-family: var(--bn-font);
+  font-size: 1.02rem;
+  line-height: 1.7;
+}
+
+.studio-app .muted {
+  color: var(--muted);
+}
+
+.studio-app .error-text {
+  color: var(--danger);
+  margin: 4px 0;
+}
+
+/* ---------- buttons / inputs ---------- */
+.studio-app .btn {
+  background: var(--bg-elev-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.studio-app .btn:hover:not(:disabled) {
+  background: #29303c;
+  border-color: #3a4350;
+}
+.studio-app .btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.studio-app .btn--sm {
+  padding: 4px 9px;
+  font-size: 0.82rem;
+  border-radius: 7px;
+}
+.studio-app .btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.studio-app .btn--primary:hover:not(:disabled) {
+  background: #4d7ef5;
+}
+.studio-app .btn--danger {
+  border-color: #4a2730;
+  color: var(--danger);
+}
+.studio-app .btn--accept {
+  border-color: #1f4b3a;
+  color: var(--accept);
+}
+.studio-app .btn--reject {
+  border-color: #4b3a1f;
+  color: var(--reject);
+}
+
+.studio-app .input,
+.studio-app .select,
+.studio-app .textarea {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 9px;
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+.studio-app .select--sm,
+.studio-app .input--sm {
+  padding: 4px 7px;
+  font-size: 0.82rem;
+}
+.studio-app .textarea {
+  width: 100%;
+  min-height: 64px;
+  resize: vertical;
+}
+
+.studio-app .field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.studio-app .field-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.studio-app .badge {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.studio-app .badge--active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ---------- layout ---------- */
+.studio-app .app {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 16px 20px 60px;
+}
+.studio-app .app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.studio-app .app-brand h1 {
+  margin: 0;
+  font-size: 1.3rem;
+}
+.studio-app .app-main {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr) 320px;
+  gap: 18px;
+  margin-top: 18px;
+}
+.studio-app .app-col {
+  min-width: 0;
+}
+@media (max-width: 1100px) {
+  .studio-app .app-main {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- record bar ---------- */
+.studio-app .recordbar {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.studio-app .recordbar-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.studio-app .record-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  padding: 12px 24px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.studio-app .record-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.studio-app .record-btn--on {
+  background: var(--danger);
+  animation: studio-pulse 1.2s infinite;
+}
+.studio-app .record-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #fff;
+}
+@keyframes studio-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 91, 110, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(255, 91, 110, 0);
+  }
+}
+.studio-app .level-meter {
+  flex: 1;
+  height: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.studio-app .level-fill {
+  height: 100%;
+  width: 0;
+  background: var(--muted);
+  transition: width 0.06s linear;
+}
+.studio-app .level-fill--on {
+  background: linear-gradient(90deg, var(--accept), var(--accent));
+}
+.studio-app .hotkey-hint {
+  font-size: 0.72rem;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 7px;
+}
+.studio-app .recordbar-controls {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.studio-app .recordbar-target {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.studio-app .recordbar-error {
+  color: var(--danger);
+  font-size: 0.85rem;
+}
+
+/* ---------- feed / cards ---------- */
+.studio-app .feed-head,
+.studio-app .editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.studio-app .feed-head h2,
+.studio-app .editor-head h2,
+.studio-app .timeline h2,
+.studio-app .pending h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.studio-app .feed-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.studio-app .filecard {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+.studio-app .filecard--active {
+  border-color: var(--accent);
+}
+.studio-app .filecard-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.studio-app .filecard-title {
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 0.98rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+.studio-app .filecard-title:hover {
+  color: var(--accent);
+}
+.studio-app .filecard-meta {
+  color: var(--muted);
+  font-size: 0.82rem;
+  margin: 6px 0 10px;
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.studio-app .filecard-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* ---------- line editor ---------- */
+.studio-app .editor-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.studio-app .line-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.studio-app .line-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 10px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px;
+  align-items: start;
+}
+.studio-app .line-row--new {
+  border-color: var(--accent);
+  background: var(--new);
+  animation: studio-flash 2.4s ease;
+}
+@keyframes studio-flash {
+  0% {
+    background: var(--accent);
+  }
+  100% {
+    background: var(--new);
+  }
+}
+.studio-app .line-row--accepted {
+  border-left: 3px solid var(--accept);
+}
+.studio-app .line-row--rejected {
+  border-left: 3px solid var(--reject);
+  opacity: 0.8;
+}
+.studio-app .line-idx {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  font-size: 0.85rem;
+  padding-top: 2px;
+}
+.studio-app .line-body {
+  min-width: 0;
+}
+.studio-app .line-text {
+  margin: 0 0 6px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.studio-app .line-tags {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.studio-app .line-tag-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.studio-app .line-tag-field .field-label {
+  margin: 0;
+}
+.studio-app .line-tag-field .input {
+  max-width: 200px;
+}
+.studio-app .tag {
+  font-size: 0.7rem;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--bg-elev-2);
+  color: var(--muted);
+}
+.studio-app .tag--accepted {
+  color: var(--accept);
+}
+.studio-app .tag--rejected {
+  color: var(--reject);
+}
+.studio-app .tag--unreviewed {
+  color: var(--accent);
+}
+.studio-app .line-edit-controls,
+.studio-app .add-line-controls {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  align-items: center;
+}
+.studio-app .line-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: stretch;
+}
+.studio-app .add-line {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.studio-app .add-line h3 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+}
+
+/* ---------- timeline ---------- */
+.studio-app .timeline-list,
+.studio-app .pending-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.studio-app .timeline-row,
+.studio-app .pending-row {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px;
+}
+.studio-app .timeline-row--current {
+  border-color: var(--accent);
+}
+.studio-app .timeline-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.studio-app .timeline-no {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.studio-app .timeline-op {
+  color: var(--muted);
+}
+.studio-app .timeline-summary {
+  margin: 6px 0;
+  font-size: 0.85rem;
+}
+.studio-app .timeline-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.78rem;
+}
+
+/* ---------- pending queue ---------- */
+.studio-app .pending {
+  margin: 16px 0;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+.studio-app .pending-row--failed {
+  border-color: #4a2730;
+}
+.studio-app .pending-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.studio-app .pending-status {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.studio-app .pending-status--uploading {
+  color: var(--accent);
+}
+.studio-app .pending-status--failed {
+  color: var(--danger);
+}
+.studio-app .pending-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+/* ---------- toasts ---------- */
+.studio-app .toasts {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 50;
+}
+.studio-app .toast {
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  max-width: 320px;
+}

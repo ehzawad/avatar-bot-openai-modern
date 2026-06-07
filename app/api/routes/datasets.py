@@ -41,11 +41,11 @@ STT_PROMPTS: dict[str, str] = {
     ),
 }
 
-# tier -> (response_format, has_segment_timestamps)
+# tier -> response_format
 TIER_RESPONSE_FORMAT: dict[str, str] = {
     "fast": "json",
     "best": "json",
-    "whisper": "verbose_json",
+    "diarize": "json",
 }
 
 
@@ -53,7 +53,7 @@ def _tier_model(cfg: Settings, tier: str) -> str:
     return {
         "fast": cfg.openai_transcribe_model_fast,
         "best": cfg.openai_transcribe_model_best,
-        "whisper": cfg.openai_transcribe_model_whisper,
+        "diarize": cfg.openai_transcribe_model_diarize,
     }.get(tier, cfg.openai_transcribe_model_best)
 
 
@@ -126,14 +126,15 @@ async def capture(
     dataset_id: str,
     audio: UploadFile = File(...),
     client_segment_id: str = Form(...),
-    tier: Literal["fast", "best", "whisper"] = Form("best"),
+    tier: Literal["fast", "best", "diarize"] = Form("best"),
     language: Literal["bn", "auto", "en"] = Form("bn"),
     prompt_id: str = Form("bn-codeswitch-v1"),
     auto_roll: bool = Form(True),
-    role: str = Form("user"),
-    eval_part: str = Form("ignored"),
+    role: Literal["user", "assistant", "interviewer", "system"] = Form("user"),
+    eval_part: Literal["prompt", "context", "expected", "ignored"] = Form("ignored"),
     conversation_key: str | None = Form(None),
     turn_index: int | None = Form(None),
+    tag: str | None = Form(None),
     duration_ms: int | None = Form(None),
     store: DatasetStore = Depends(dataset_store),
     openai: OpenAIGateway = Depends(openai_gateway),
@@ -153,10 +154,21 @@ async def capture(
             raw_transcript=None,
             metadata={},
             auto_roll=auto_roll,
+            tag=tag,
         )
         return AppendResult(**result)
 
+    # Validate the target dataset BEFORE reading/persisting audio or transcribing, so a bad
+    # or deleted dataset_id fails fast with 404 instead of wasting an OpenAI call + leaving
+    # an orphan audio file and capture_segments row.
+    try:
+        await store.ensure_dataset(dataset_id)
+    except NotFoundError as exc:
+        raise as_http_error(OpenAIServiceError(str(exc), status.HTTP_404_NOT_FOUND)) from exc
+
     audio_bytes = await audio.read()
+    if not audio_bytes:
+        raise as_http_error(OpenAIServiceError("No audio was uploaded.", status.HTTP_400_BAD_REQUEST))
 
     # Audio-first durability: persist + upsert the segment as 'stored' before transcribing.
     try:
@@ -176,11 +188,14 @@ async def capture(
     # Build transcription parameters.
     model = _tier_model(cfg, tier)
     response_format = TIER_RESPONSE_FORMAT.get(tier, "json")
-    prompt = STT_PROMPTS.get(prompt_id, STT_PROMPTS["bn-codeswitch-v1"])
     extra: dict[str, object] = {"temperature": "0"}
-    if tier == "whisper":
-        extra["timestamp_granularities[]"] = ["segment"]
+    # The diarization model has a restricted parameter surface: it rejects `prompt`
+    # ("Prompt is not supported for diarization models") and the include[]/timestamp
+    # extras. fast/best (gpt-4o(-mini)-transcribe) take the Bengali prompt + logprobs QC.
+    if tier == "diarize":
+        prompt: str | None = None
     else:
+        prompt = STT_PROMPTS.get(prompt_id, STT_PROMPTS["bn-codeswitch-v1"])
         extra["include[]"] = ["logprobs"]
 
     try:
@@ -246,6 +261,7 @@ async def capture(
             raw_transcript=text,
             metadata=metadata,
             auto_roll=auto_roll,
+            tag=tag,
         )
     except NotFoundError as exc:
         raise as_http_error(OpenAIServiceError(str(exc), status.HTTP_404_NOT_FOUND)) from exc
@@ -269,6 +285,7 @@ async def add_line(
             eval_part=body.eval_part.value,
             conversation_key=body.conversation_key,
             turn_index=body.turn_index,
+            tag=body.tag,
             source="manual",
             base_revision_id=body.base_revision_id,
             auto_roll=True,
@@ -367,9 +384,9 @@ async def rollback(
 @router.get("/{dataset_id}/download")
 async def download(
     dataset_id: str,
-    format: Literal["txt", "jsonl"] = Query("txt"),
+    format: Literal["txt", "jsonl", "csv"] = Query("txt"),
     annotated: bool = Query(False),
-    scope: Literal["accepted", "all"] = Query("accepted"),
+    scope: Literal["accepted", "all"] | None = Query(None),
     store: DatasetStore = Depends(dataset_store),
 ) -> StreamingResponse:
     try:
@@ -382,8 +399,15 @@ async def download(
         content = await store.export_txt(dataset_id, annotated=annotated)
         media_type = "text/plain; charset=utf-8"
         filename = f"{base}.txt"
+    elif format == "csv":
+        # CSV default scope is 'all' (contract section 6); 'accepted' is opt-in.
+        csv_scope = scope or "all"
+        content = await store.export_csv(dataset_id, scope=csv_scope)
+        media_type = "text/csv; charset=utf-8"
+        filename = f"{base}.csv"
     else:
-        content = await store.export_jsonl(dataset_id, scope=scope)
+        # jsonl default scope is 'accepted' (contract section 3).
+        content = await store.export_jsonl(dataset_id, scope=scope or "accepted")
         media_type = "application/x-ndjson"
         filename = f"{base}.jsonl"
 

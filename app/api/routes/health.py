@@ -40,7 +40,7 @@ async def public_config(cfg: Settings = Depends(settings)) -> PublicConfig:
         transcribe_tiers=[
             TranscribeTier(id="fast", label="Fast", model=cfg.openai_transcribe_model_fast),
             TranscribeTier(id="best", label="Best", model=cfg.openai_transcribe_model_best),
-            TranscribeTier(id="whisper", label="Whisper", model=cfg.openai_transcribe_model_whisper),
+            TranscribeTier(id="diarize", label="Diarize", model=cfg.openai_transcribe_model_diarize),
         ],
         stt_prompts=[SttPrompt(id="bn-codeswitch-v1", label="Bengali code-switch v1")],
         languages=["bn", "auto", "en"],

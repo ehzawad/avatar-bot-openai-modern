@@ -4,8 +4,9 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncIterator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.router import api_router
@@ -16,8 +17,7 @@ from app.services.orchestrator import AvatarConversationService
 from app.services.session_store import InMemorySessionStore
 
 ROOT = Path(__file__).resolve().parents[1]
-FRONTEND_DIR = ROOT / "frontend"
-STUDIO_DIST = ROOT / "studio-web" / "dist"
+WEB_DIST = ROOT / "web" / "dist"
 
 
 @asynccontextmanager
@@ -55,13 +55,23 @@ def create_app() -> FastAPI:
 
     app.include_router(api_router)
 
-    # Studio SPA build is mounted BEFORE the root mount so /studio resolves first.
-    if STUDIO_DIST.exists():
-        app.mount("/studio", StaticFiles(directory=STUDIO_DIST, html=True), name="studio")
+    # Single unified SPA (web/dist) — serve hashed assets, then a guarded catch-all
+    # that returns index.html for client routes. Guarded on WEB_DIST existence so the
+    # app still imports/runs before the frontend is built. data/ is never web-served.
+    if WEB_DIST.exists():
+        app.mount("/assets", StaticFiles(directory=WEB_DIST / "assets"), name="web-assets")
 
-    # Existing root mount stays LAST.
-    if FRONTEND_DIR.exists():
-        app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+        @app.get("/{path:path}", include_in_schema=False)
+        async def spa_fallback(path: str) -> FileResponse:
+            candidate = (WEB_DIST / path).resolve()
+            if path and candidate.is_file() and candidate.is_relative_to(WEB_DIST):
+                return FileResponse(candidate)
+            if path.startswith("api/") or "." in Path(path).name:
+                raise HTTPException(status_code=404)
+            return FileResponse(
+                WEB_DIST / "index.html",
+                headers={"Cache-Control": "no-cache"},
+            )
 
     return app
 

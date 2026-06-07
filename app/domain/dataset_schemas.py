@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 class Tier(StrEnum):
     fast = "fast"
     best = "best"
-    whisper = "whisper"
+    diarize = "diarize"
 
 
 class Role(StrEnum):
@@ -65,6 +65,7 @@ class Line(BaseModel):
     conversation_key: str | None = None
     turn_index: int | None = None
     text: str
+    tag: str | None = None
     raw_transcript: str | None = None
     source: str
     review_status: ReviewStatus
@@ -117,6 +118,7 @@ class AddLineRequest(BaseModel):
     eval_part: EvalPart = EvalPart.ignored
     conversation_key: str | None = None
     turn_index: int | None = None
+    tag: str | None = None
     base_revision_id: int | None = None
 
 
@@ -126,6 +128,7 @@ class EditLineRequest(BaseModel):
     eval_part: EvalPart | None = None
     conversation_key: str | None = None
     turn_index: int | None = None
+    tag: str | None = None
     review_status: ReviewStatus | None = None
     flags: list[str] | None = None
     base_revision_id: int | None = None

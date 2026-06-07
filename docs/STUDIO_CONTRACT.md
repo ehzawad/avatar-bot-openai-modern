@@ -1,5 +1,10 @@
 # Bengali Conversational Eval Studio — FROZEN CONTRACT (v1)
 
+> **SUPERSEDED in two places by later work:** (1) the frontend now lives in the unified `web/`
+> app (see [WEB_CONTRACT.md](WEB_CONTRACT.md)), not `studio-web/`; (2) the transcription tiers are
+> now `fast` / `best` / **`diarize`** (`gpt-4o-transcribe-diarize`) — the `whisper` / `whisper-1`
+> tier and `OPENAI_TRANSCRIBE_MODEL_WHISPER` were removed. Everything else below still holds.
+
 This document is the **single source of truth**. Backend, frontend, and docs are all
 implemented against it. Do **not** invent endpoint names, field names, table names, or JSON
 shapes that aren't here. If something is genuinely missing, prefer the closest thing here.
@@ -171,7 +176,8 @@ CREATE TABLE IF NOT EXISTS revision_lines (
 
 CREATE TABLE IF NOT EXISTS capture_segments (        -- audio-first durability + idempotency
   id            TEXT PRIMARY KEY,                     -- = client segment id (idempotency key)
-  dataset_id    TEXT NOT NULL,
+  dataset_id    TEXT NOT NULL,                        -- originally requested dataset/page
+  target_dataset_id TEXT,                             -- actual dataset/page written after auto-roll
   audio_path    TEXT,                                 -- data/audio/<sha>.webm
   audio_sha256  TEXT,
   duration_ms   INTEGER,
@@ -191,7 +197,7 @@ insert `revisions` row (revision_no = prev+1) → copy current non-deleted lines
 
 **Reorder:** client sends the full ordered list of line ids. Validate it's an exact permutation
 of current non-deleted line ids (else 409/422). Two-phase update because `UNIQUE(dataset_id,
-line_index)`: first set indices to `-(i+1)`, then to final `i`.
+line_index)`: first set indices to large positive temporary values, then to final `i`.
 
 **Delete line:** soft delete (`deleted_at`), then renumber remaining non-deleted lines to stay
 contiguous 0-based (two-phase, same as reorder).
@@ -200,9 +206,12 @@ contiguous 0-based (two-phase, same as reorder).
 re-insert from `revision_lines` of the target revision → write a new `rollback` revision (with
 `meta_json.target_revision_id`) and snapshot. History is never destroyed.
 
-**Auto-roll (append):** if target dataset's non-deleted line count >= series.page_size, mark it
-`full`, create the next page (page_no+1, name `"<series title> <NNN>"`), and append there.
-Return which dataset was actually written + `rolled`.
+**Auto-roll (append):** if the requested dataset's non-deleted line count >= series.page_size,
+mark it `full`, resolve the series landing page, and append there. The landing page is the
+highest `page_no` non-deleted page if it has capacity; otherwise create a new page after the
+highest `page_no` across all rows in the series, including soft-deleted rows that still reserve
+`UNIQUE(series_id, page_no)`. Return both the requested dataset and the dataset actually written
+plus `rolled`.
 
 ---
 
@@ -221,12 +230,18 @@ IDs: `ser_`, `ds_`, `ln_` prefixes. Timestamps ISO-8601 UTC strings.
 ### Capture (primary voice loop — audio-first, idempotent)
 - `POST /api/datasets/{dataset_id}/capture` — multipart form:
   - `audio` (file), `client_segment_id` (str, idempotency key, required),
-  - `tier` (`fast|best|whisper`, default `best`), `language` (`bn|auto|en`, default `bn`),
+  - `tier` (`fast|best|diarize`, default `best`), `language` (`bn|auto|en`, default `bn`),
   - `prompt_id` (default `bn-codeswitch-v1`), `auto_roll` (`true|false`, default `true`),
-  - `role` (default `user`), `eval_part` (default `ignored`),
+  - `role` (`user|assistant|interviewer|system`, default `user`), `eval_part`
+    (`prompt|context|expected|ignored`, default `ignored`), `tag` (optional),
   - `conversation_key` (optional), `turn_index` (optional int), `duration_ms` (optional int).
-  - Flow: persist audio under `data/audio/` → upsert `capture_segments` (idempotent) →
-    transcribe → append line (+ auto-roll) in one tx → return `AppendResult`.
+  - `tier`/`language`/`role`/`eval_part` are enum-validated at parse time → **422 before any
+    side effect**. `diarize` (`gpt-4o-transcribe-diarize`) is sent no `prompt`/`include[]`
+    (it rejects them) and transcribes Bengali in Latin script — prefer `best` for Bengali text.
+  - Flow: **validate enums (422) → check dataset exists (404) → reject empty audio (400) →**
+    persist audio under `data/audio/` → upsert `capture_segments` (idempotent) → transcribe →
+    append line (+ auto-roll) in one tx → return `AppendResult`. Validation precedes the OpenAI
+    call so a bad request never wastes a transcription.
   - If `client_segment_id` already `appended`, return the existing `AppendResult` (no dup).
   - On transcription failure: segment stays `failed`/`stored`; return `502` with
     `{ detail, client_segment_id }`; audio retained for retry.

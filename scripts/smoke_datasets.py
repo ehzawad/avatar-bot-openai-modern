@@ -108,6 +108,201 @@ async def run() -> None:
     check("rollback" in ops, "rollback revision recorded")
     check(revs[0]["revision_no"] > revs[-1]["revision_no"], "revisions listed newest-first")
 
+    # 9. Auto-roll: stale/full requested pages land on the series landing page.
+    roll_card = await store.create_series(title="Roll series", page_size=2, language="bn")
+    roll_p1 = roll_card["id"]
+    await store.append(roll_p1, text="r1", role="user", eval_part="ignored", source="manual")
+    await store.append(roll_p1, text="r2", role="user", eval_part="ignored", source="manual")
+    rolled_once = await store.append(roll_p1, text="r3", role="user", eval_part="ignored", source="manual")
+    roll_p2 = rolled_once["dataset_id"]
+    check(rolled_once["rolled"] and roll_p2 != roll_p1, "auto-roll creates page 2 from a full latest page")
+    check(rolled_once["dataset"]["page_no"] == 2, "first roll lands on page_no=2")
+    rolled_existing = await store.append(roll_p1, text="r4", role="user", eval_part="ignored", source="manual")
+    check(rolled_existing["dataset_id"] == roll_p2, "stale full page rolls to existing latest page with capacity")
+    roll_p2_detail = await store.get_dataset_detail(roll_p2)
+    check([ln["text"] for ln in roll_p2_detail["lines"]] == ["r3", "r4"], "existing landing page received second stale-page append")
+    roll_p2_revs = await store.list_revisions(roll_p2)
+    check(sum(1 for r in roll_p2_revs if r["op"] == "create") == 1, "rolling to existing page does not write another create revision")
+
+    full_card = await store.create_series(title="Full roll series", page_size=1, language="bn")
+    full_p1 = full_card["id"]
+    await store.append(full_p1, text="f1", role="user", eval_part="ignored", source="manual")
+    full_p2 = await store.append(full_p1, text="f2", role="user", eval_part="ignored", source="manual")
+    full_p3 = await store.append(full_p1, text="f3", role="user", eval_part="ignored", source="manual")
+    check(full_p2["dataset"]["page_no"] == 2, "page_size=1 first roll creates page 2")
+    check(full_p3["dataset"]["page_no"] == 3, "all-pages-full stale append creates the next page")
+
+    gap_card = await store.create_series(title="Gap roll series", page_size=1, language="bn")
+    gap_p1 = gap_card["id"]
+    await store.append(gap_p1, text="g1", role="user", eval_part="ignored", source="manual")
+    gap_p2 = await store.append(gap_p1, text="g2", role="user", eval_part="ignored", source="manual")
+    await store.delete_dataset(gap_p2["dataset_id"])
+    gap_p3 = await store.append(gap_p1, text="g3", role="user", eval_part="ignored", source="manual")
+    check(gap_p3["dataset"]["page_no"] == 3, "auto-roll allocates after soft-deleted page_no")
+
+    # 10. Capture segment idempotency stays terminal once appended.
+    cap_card = await store.create_series(title="Capture idempotency", page_size=50, language="bn")
+    cap_ds = cap_card["id"]
+    seg_id = "seg_smoke_idempotent"
+    await store.upsert_capture_segment(
+        client_segment_id=seg_id,
+        dataset_id=cap_ds,
+        audio_path="data/audio/one.webm",
+        audio_sha256="sha-one",
+        duration_ms=1000,
+        status_value="stored",
+    )
+    cap_first = await store.append_for_capture(
+        cap_ds,
+        client_segment_id=seg_id,
+        text="capture one",
+        role="user",
+        eval_part="ignored",
+        conversation_key=None,
+        turn_index=None,
+        raw_transcript="capture one",
+        metadata={},
+        auto_roll=True,
+    )
+    await store.upsert_capture_segment(
+        client_segment_id=seg_id,
+        dataset_id=cap_ds,
+        audio_path="data/audio/two.webm",
+        audio_sha256="sha-two",
+        duration_ms=2000,
+        status_value="transcribed",
+    )
+    seg_after = await store.get_capture_segment(seg_id)
+    check(seg_after is not None and seg_after["status"] == "appended", "capture upsert cannot downgrade appended segment")
+    check(seg_after["line_id"] == cap_first["line"]["id"], "capture upsert preserves appended line id")
+    cap_retry = await store.append_for_capture(
+        cap_ds,
+        client_segment_id=seg_id,
+        text="capture duplicate",
+        role="user",
+        eval_part="ignored",
+        conversation_key=None,
+        turn_index=None,
+        raw_transcript="capture duplicate",
+        metadata={},
+        auto_roll=True,
+    )
+    cap_detail = await store.get_dataset_detail(cap_ds)
+    check(cap_retry["line"]["id"] == cap_first["line"]["id"], "capture retry returns original line")
+    check([ln["text"] for ln in cap_detail["lines"]] == ["capture one"], "capture retry does not duplicate append")
+
+    cap_roll_card = await store.create_series(title="Capture roll idempotency", page_size=1, language="bn")
+    cap_roll_p1 = cap_roll_card["id"]
+    await store.upsert_capture_segment(
+        client_segment_id="seg_smoke_roll_first",
+        dataset_id=cap_roll_p1,
+        audio_path="data/audio/roll-one.webm",
+        audio_sha256="sha-roll-one",
+        duration_ms=1000,
+        status_value="stored",
+    )
+    await store.append_for_capture(
+        cap_roll_p1,
+        client_segment_id="seg_smoke_roll_first",
+        text="roll capture one",
+        role="user",
+        eval_part="ignored",
+        conversation_key=None,
+        turn_index=None,
+        raw_transcript="roll capture one",
+        metadata={},
+        auto_roll=True,
+    )
+    await store.upsert_capture_segment(
+        client_segment_id="seg_smoke_roll_second",
+        dataset_id=cap_roll_p1,
+        audio_path="data/audio/roll-two.webm",
+        audio_sha256="sha-roll-two",
+        duration_ms=1000,
+        status_value="stored",
+    )
+    cap_roll_append = await store.append_for_capture(
+        cap_roll_p1,
+        client_segment_id="seg_smoke_roll_second",
+        text="roll capture two",
+        role="user",
+        eval_part="ignored",
+        conversation_key=None,
+        turn_index=None,
+        raw_transcript="roll capture two",
+        metadata={},
+        auto_roll=True,
+    )
+    cap_roll_retry = await store.append_for_capture(
+        cap_roll_p1,
+        client_segment_id="seg_smoke_roll_second",
+        text="roll capture duplicate",
+        role="user",
+        eval_part="ignored",
+        conversation_key=None,
+        turn_index=None,
+        raw_transcript="roll capture duplicate",
+        metadata={},
+        auto_roll=True,
+    )
+    check(cap_roll_append["requested_dataset_id"] == cap_roll_p1, "rolled capture records original requested page")
+    check(cap_roll_append["rolled"] and cap_roll_append["dataset_id"] != cap_roll_p1, "rolled capture reports actual target page")
+    check(cap_roll_retry["requested_dataset_id"] == cap_roll_append["requested_dataset_id"], "rolled capture retry preserves requested page")
+    check(cap_roll_retry["dataset_id"] == cap_roll_append["dataset_id"], "rolled capture retry preserves actual target page")
+    check(cap_roll_retry["rolled"] == cap_roll_append["rolled"], "rolled capture retry preserves rolled flag")
+
+    # 11. Per-line TAG + CSV export (contract section 6).
+    tag_card = await store.create_series(title="Tag series", page_size=50, language="bn")
+    tag_ds = tag_card["id"]
+    # A line whose tag is set and whose text has a comma AND a double-quote.
+    tricky_text = 'আমি ভালো আছি, "সত্যিই"।'
+    r_tag = await store.append(tag_ds, text=tricky_text, role="user", source="manual", tag="greeting")
+    tagged_line_id = r_tag["line"]["id"]
+    check(r_tag["line"]["tag"] == "greeting", "tag stored on capture/append")
+    # A null-tag line (whitespace-only tag normalizes to NULL).
+    r_null = await store.append(tag_ds, text="দ্বিতীয় লাইন", role="user", source="manual", tag="   ")
+    check(r_null["line"]["tag"] is None, "whitespace-only tag stored as NULL")
+
+    # CSV builder: RFC-4180 quoting.
+    detail = await store.get_dataset_detail(tag_ds)
+    csv_out = store.build_csv(detail["lines"], scope="all")
+    csv_lines = csv_out.split("\r\n")
+    check(csv_lines[0] == '"text","tagname"', "csv header is quoted text,tagname")
+    # comma + embedded double-quote round-trips: quotes doubled, whole field wrapped.
+    expected_tricky = '"আমি ভালো আছি, ""সত্যিই""।","greeting"'
+    check(csv_lines[1] == expected_tricky, "comma+quote text RFC-4180 quoted with tag")
+    check(csv_lines[2] == '"দ্বিতীয় লাইন",""', "null-tag line emits empty quoted field")
+    # Round-trip back through the csv module to confirm correctness.
+    import csv as _csv
+    import io as _io
+
+    parsed = list(_csv.reader(_io.StringIO(csv_out)))
+    check(parsed[0] == ["text", "tagname"], "csv parses back to header row")
+    check(parsed[1] == [tricky_text, "greeting"], "csv round-trips tricky text + tag")
+    check(parsed[2] == ["দ্বিতীয় লাইন", ""], "csv round-trips null tag as empty string")
+
+    # export_csv via the async store path.
+    csv_async = await store.export_csv(tag_ds, scope="all")
+    check(csv_async == csv_out, "export_csv matches build_csv output")
+
+    # 12. Tag survives an edit and a rollback.
+    detail_before_edit = await store.get_dataset_detail(tag_ds)
+    rev_with_tags = detail_before_edit["current_revision_id"]
+    await store.edit_line(tag_ds, tagged_line_id, fields={"tag": "salutation"}, base_revision_id=None)
+    detail = await store.get_dataset_detail(tag_ds)
+    edited = next(ln for ln in detail["lines"] if ln["id"] == tagged_line_id)
+    check(edited["tag"] == "salutation", "tag survives an edit (new value applied)")
+    # Clearing a tag via empty string -> NULL.
+    await store.edit_line(tag_ds, tagged_line_id, fields={"tag": "  "}, base_revision_id=None)
+    detail = await store.get_dataset_detail(tag_ds)
+    cleared = next(ln for ln in detail["lines"] if ln["id"] == tagged_line_id)
+    check(cleared["tag"] is None, "tag cleared to NULL via whitespace edit")
+    # Rollback to the snapshot taken when tag was 'greeting'.
+    await store.rollback(tag_ds, target_revision_id=rev_with_tags)
+    detail = await store.get_dataset_detail(tag_ds)
+    rolled = next(ln for ln in detail["lines"] if ln["id"] == tagged_line_id)
+    check(rolled["tag"] == "greeting", "tag survives a rollback (restored from snapshot)")
+
 
 def main() -> int:
     try:

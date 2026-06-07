@@ -45,7 +45,9 @@ rejected as a revision conflict instead of silently clobbering newer state.
 
 ### Frontend (React / Vite / TanStack Query / zundo)
 
-The studio frontend (`studio-web/`) is React 19 + Vite + TypeScript:
+The studio is the `studio` feature of the unified `web/` app (React 19 + Vite + TypeScript),
+served at `/studio` and lazy-loaded so it never pulls the avatar's Three.js code. See
+[WEB_ARCHITECTURE.md](WEB_ARCHITECTURE.md) for the overall frontend layout. Within that app:
 
 - **TanStack Query** owns server state: datasets, a single dataset's detail, and its revisions,
   plus all mutations (capture, add/edit/delete/reorder line, rollback, create/rename/delete
@@ -56,7 +58,7 @@ The studio frontend (`studio-web/`) is React 19 + Vite + TypeScript:
   rollback, the local temporal history is cleared. Durable rollback is always the server
   revisions endpoint.
 - All API calls are root-relative (`/api/...`): the Vite dev proxy handles them in dev, and the
-  same origin serves them in the built `/studio` mount.
+  same origin (FastAPI serving `web/dist`) serves them in prod.
 
 ### Capture-segment audio-first flow
 
@@ -89,6 +91,21 @@ Other per-line fields support review and provenance: `review_status`
 (`voice` / `manual` / `import`), and a `metadata` blob (STT model, tier, requested language,
 prompt id, audio duration/sha/path, logprob average, etc.).
 
+### Per-line tag
+
+Each line also carries an optional, nullable **`tag`** (`tag: string | null`) — a free-text label
+(for example `greeting`). It is independent of `role` / `eval_part` and exists purely for
+flat-table labeling and the CSV export.
+
+- **Storage:** `tag TEXT` (nullable, default `NULL`) on both `lines` and `revision_lines`, so the
+  tag is snapshotted with the line and survives rollback. Empty or whitespace-only input is stored
+  as `NULL`.
+- **API:** `tag` is accepted as an optional field on `POST .../capture`, `POST .../lines`, and
+  `PATCH .../lines/{id}`, and is returned on `Line`. See
+  [STUDIO_CONTRACT.md](STUDIO_CONTRACT.md) §6.
+- **Frontend:** one sticky tag text box in the record bar (applied as the `tag` of each capture,
+  `null` when empty) and an editable tag field per row in the line editor.
+
 ### How `.jsonl` export groups lines
 
 The `.jsonl` download groups by `conversation_key` and shapes each example into a
@@ -102,6 +119,33 @@ messages-plus-expected record. Conceptually:
   all non-deleted lines.
 
 See STUDIO_CONTRACT.md §3 for the exact JSON shape and metadata fields.
+
+### CSV export (`text,tagname`)
+
+Alongside `.txt` and `.jsonl`, a page exports as a flat `.csv` for spreadsheet and labeling tools:
+`GET /api/datasets/{dataset_id}/download?format=csv&scope=all` →
+`text/csv; charset=utf-8` attachment.
+
+- **Columns:** a header row `text,tagname`, then one row per non-deleted line in `line_index`
+  order. `tagname` is the line's `tag` (empty when the tag is `NULL`).
+- **RFC-4180 quoting:** every field is wrapped in double quotes, and any embedded double quote is
+  doubled (`""`). A null tag is emitted as an empty quoted field `""`. UTF-8 (Bengali) text is
+  preserved.
+- **Scope:** `all` (default, all non-deleted lines) or `accepted` (`review_status='accepted'`),
+  mirroring the txt/jsonl scope handling.
+
+Example output:
+
+```csv
+text,tagname
+"আজ তুমি কেমন আছো?","greeting"
+"আমি ভালো আছি, ""সত্যিই""।",""
+```
+
+The second row shows both rules at once: the line's text contains a literal `"সত্যিই"`, so each
+inner quote is doubled inside the quoted field, and the line has no tag, so `tagname` is `""`.
+
+See STUDIO_CONTRACT.md §6 for the authoritative endpoint, quoting, and smoke-test requirements.
 
 ## Rollback model
 
@@ -132,8 +176,10 @@ Transcription is tuned for Bengali conversational utterances with English code-s
 - **Hallucination gating:** the prompt explicitly tells the model to transcribe only what is
   audible and to leave the output empty when nothing is heard, rather than inventing plausible
   Bengali. Tier choice supports this — `best` (`gpt-4o-transcribe`) is the default for eval
-  quality, and `gpt-4o-*` tiers request logprobs (whisper uses segment timestamps) so the
-  recorded `metadata` can carry a logprob average for downstream confidence review.
+  quality, and the `fast`/`best` `gpt-4o-*` tiers request logprobs so the recorded `metadata`
+  can carry a logprob average for downstream confidence review. The `diarize`
+  (`gpt-4o-transcribe-diarize`) tier is speaker-aware but rejects `prompt`/`include[]`, so it
+  romanizes Bengali — prefer `best` for Bengali-script text, use `diarize` for multi-speaker.
 
 Because the original ASR draft is preserved in each line's `raw_transcript` and never overwritten
 by edits, reviewers can always compare the gold `text` against what the model actually produced.

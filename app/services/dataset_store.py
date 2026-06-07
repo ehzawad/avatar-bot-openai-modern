@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS lines (
   conversation_key TEXT,
   turn_index       INTEGER,
   text             TEXT NOT NULL,
+  tag              TEXT,
   raw_transcript   TEXT,
   source           TEXT NOT NULL DEFAULT 'voice' CHECK (source IN ('voice','manual','import')),
   review_status    TEXT NOT NULL DEFAULT 'unreviewed' CHECK (review_status IN ('unreviewed','accepted','rejected','needs_review')),
@@ -88,6 +89,7 @@ CREATE TABLE IF NOT EXISTS revision_lines (
   conversation_key TEXT,
   turn_index       INTEGER,
   text             TEXT NOT NULL,
+  tag              TEXT,
   raw_transcript   TEXT,
   source           TEXT NOT NULL,
   review_status    TEXT NOT NULL,
@@ -101,6 +103,7 @@ CREATE TABLE IF NOT EXISTS revision_lines (
 CREATE TABLE IF NOT EXISTS capture_segments (
   id            TEXT PRIMARY KEY,
   dataset_id    TEXT NOT NULL,
+  target_dataset_id TEXT,
   audio_path    TEXT,
   audio_sha256  TEXT,
   duration_ms   INTEGER,
@@ -130,6 +133,14 @@ def _new_id(prefix: str) -> str:
 
 def _sha256_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _normalize_tag(tag: str | None) -> str | None:
+    """Empty string / whitespace-only tag stores as NULL (contract section 6)."""
+    if tag is None:
+        return None
+    stripped = tag.strip()
+    return stripped or None
 
 
 class NotFoundError(Exception):
@@ -164,11 +175,24 @@ class DatasetStore:
         cur.close()
         return conn
 
+    @staticmethod
+    def _add_column_if_missing(
+        conn: sqlite3.Connection, table: str, column: str, decl: str
+    ) -> None:
+        """Idempotent ALTER TABLE ADD COLUMN guarded by a PRAGMA table_info check."""
+        cols = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        if column not in cols:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+
     def _init_db_sync(self) -> None:
         self._ensure_dirs()
         conn = self._connect()
         try:
             conn.executescript(_DDL)
+            # Idempotent migration so existing data/studio.db upgrades to carry per-line tag.
+            self._add_column_if_missing(conn, "lines", "tag", "TEXT")
+            self._add_column_if_missing(conn, "revision_lines", "tag", "TEXT")
+            self._add_column_if_missing(conn, "capture_segments", "target_dataset_id", "TEXT")
         finally:
             conn.close()
 
@@ -203,6 +227,7 @@ class DatasetStore:
             "conversation_key": row["conversation_key"],
             "turn_index": row["turn_index"],
             "text": row["text"],
+            "tag": row["tag"],
             "raw_transcript": row["raw_transcript"],
             "source": row["source"],
             "review_status": row["review_status"],
@@ -280,11 +305,11 @@ class DatasetStore:
         for r in rows:
             conn.execute(
                 "INSERT INTO revision_lines (revision_id, line_id, line_index, role, eval_part, conversation_key, "
-                "turn_index, text, raw_transcript, source, review_status, flags_json, metadata_json, text_hash, created_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "turn_index, text, tag, raw_transcript, source, review_status, flags_json, metadata_json, text_hash, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     revision_id, r["id"], r["line_index"], r["role"], r["eval_part"], r["conversation_key"],
-                    r["turn_index"], r["text"], r["raw_transcript"], r["source"], r["review_status"],
+                    r["turn_index"], r["text"], r["tag"], r["raw_transcript"], r["source"], r["review_status"],
                     r["flags_json"], r["metadata_json"], r["text_hash"], now,
                 ),
             )
@@ -337,6 +362,22 @@ class DatasetStore:
                 conn.close()
 
         return await run_in_threadpool(work)
+
+    async def ensure_dataset(self, dataset_id: str) -> None:
+        """Raise NotFoundError if the dataset does not exist (or is soft-deleted).
+
+        Cheap existence probe used by the capture route to reject a bad ``dataset_id``
+        *before* persisting audio or spending an OpenAI transcription call.
+        """
+
+        def work() -> None:
+            conn = self._connect()
+            try:
+                self._get_dataset_row(conn, dataset_id)
+            finally:
+                conn.close()
+
+        await run_in_threadpool(work)
 
     async def get_dataset_detail(self, dataset_id: str) -> dict[str, Any]:
         def work() -> dict[str, Any]:
@@ -497,6 +538,7 @@ class DatasetStore:
         eval_part: str = "ignored",
         conversation_key: str | None = None,
         turn_index: int | None = None,
+        tag: str | None = None,
         raw_transcript: str | None = None,
         source: str = "voice",
         metadata: dict[str, Any] | None = None,
@@ -515,6 +557,7 @@ class DatasetStore:
                 eval_part,
                 conversation_key,
                 turn_index,
+                tag,
                 raw_transcript,
                 source,
                 metadata,
@@ -533,6 +576,7 @@ class DatasetStore:
         eval_part: str,
         conversation_key: str | None,
         turn_index: int | None,
+        tag: str | None,
         raw_transcript: str | None,
         source: str,
         metadata: dict[str, Any] | None,
@@ -554,7 +598,7 @@ class DatasetStore:
             target_id = dataset_id
             if auto_roll and self._line_count(conn, dataset_id) >= series["page_size"]:
                 target_id = self._roll_to_next_page(conn, ds, series)
-                rolled = True
+                rolled = target_id != requested_dataset_id
 
             line = self._insert_line(
                 conn,
@@ -564,6 +608,7 @@ class DatasetStore:
                 eval_part=eval_part,
                 conversation_key=conversation_key,
                 turn_index=turn_index,
+                tag=tag,
                 raw_transcript=raw_transcript,
                 source=source,
                 metadata=metadata,
@@ -599,12 +644,40 @@ class DatasetStore:
             conn.close()
 
     def _roll_to_next_page(self, conn: sqlite3.Connection, ds: sqlite3.Row, series: sqlite3.Row) -> str:
+        """Resolve the append target for a full page in a series.
+
+        The requested page may be an older full page. In that case, append to the
+        latest non-deleted page if it still has room; otherwise allocate a new page
+        after every existing page_no, including soft-deleted rows that still reserve
+        their UNIQUE(series_id, page_no) value.
+        """
         now = _now()
-        conn.execute(
-            "UPDATE datasets SET status = 'full', updated_at = ? WHERE id = ?",
-            (now, ds["id"]),
-        )
-        next_page = int(ds["page_no"]) + 1
+        page_size = int(series["page_size"])
+        if self._line_count(conn, ds["id"]) >= page_size and ds["status"] != "full":
+            conn.execute(
+                "UPDATE datasets SET status = 'full', updated_at = ? WHERE id = ?",
+                (now, ds["id"]),
+            )
+
+        latest = conn.execute(
+            "SELECT * FROM datasets "
+            "WHERE series_id = ? AND deleted_at IS NULL "
+            "ORDER BY page_no DESC LIMIT 1",
+            (ds["series_id"],),
+        ).fetchone()
+        if latest is not None and self._line_count(conn, latest["id"]) < page_size:
+            if latest["status"] == "full":
+                conn.execute(
+                    "UPDATE datasets SET status = 'active', updated_at = ? WHERE id = ?",
+                    (now, latest["id"]),
+                )
+            return str(latest["id"])
+
+        row = conn.execute(
+            "SELECT COALESCE(MAX(page_no), 0) AS m FROM datasets WHERE series_id = ?",
+            (ds["series_id"],),
+        ).fetchone()
+        next_page = int(row["m"]) + 1
         new_id = _new_id("ds")
         name = self._page_name(series["title"], next_page)
         conn.execute(
@@ -625,6 +698,7 @@ class DatasetStore:
         eval_part: str,
         conversation_key: str | None,
         turn_index: int | None,
+        tag: str | None,
         raw_transcript: str | None,
         source: str,
         metadata: dict[str, Any] | None,
@@ -640,12 +714,12 @@ class DatasetStore:
         line_index = int(row["m"]) + 1
         conn.execute(
             "INSERT INTO lines (id, dataset_id, line_index, role, eval_part, conversation_key, turn_index, text, "
-            "raw_transcript, source, review_status, flags_json, metadata_json, text_hash, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "tag, raw_transcript, source, review_status, flags_json, metadata_json, text_hash, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 line_id, dataset_id, line_index, role, eval_part, conversation_key, turn_index, text,
-                raw_transcript, source, review_status, json.dumps(flags or []), json.dumps(metadata or {}),
-                _sha256_text(text), now, now,
+                _normalize_tag(tag), raw_transcript, source, review_status, json.dumps(flags or []),
+                json.dumps(metadata or {}), _sha256_text(text), now, now,
             ),
         )
         return {"id": line_id, "line_index": line_index}
@@ -688,6 +762,10 @@ class DatasetStore:
             if "text" in fields and fields["text"] is not None:
                 sets.append("text_hash = ?")
                 params.append(_sha256_text(fields["text"]))
+            # tag: empty/whitespace -> NULL; allow explicit clearing when key is present.
+            if "tag" in fields:
+                sets.append("tag = ?")
+                params.append(_normalize_tag(fields["tag"]))
             if "flags" in fields and fields["flags"] is not None:
                 sets.append("flags_json = ?")
                 params.append(json.dumps(fields["flags"]))
@@ -739,11 +817,13 @@ class DatasetStore:
             # soft delete: move it to a high, unique index out of the live 0..N range so the
             # remaining lines can renumber to contiguous 0-based values. CHECK(line_index >= 0)
             # forbids negatives, so use a large positive parking index unique per deleted row.
-            deleted_count = conn.execute(
-                "SELECT COUNT(*) AS c FROM lines WHERE dataset_id = ? AND deleted_at IS NOT NULL",
-                (dataset_id,),
-            ).fetchone()["c"]
-            park_index = self._TEMP_OFFSET * 2 + int(deleted_count)
+            row = conn.execute(
+                "SELECT COALESCE(MAX(line_index), ?) AS m FROM lines WHERE dataset_id = ?",
+                (self._TEMP_OFFSET * 2 - 1, dataset_id),
+            ).fetchone()
+            park_index = int(row["m"]) + 1
+            if park_index < self._TEMP_OFFSET * 2:
+                park_index = self._TEMP_OFFSET * 2
             conn.execute(
                 "UPDATE lines SET deleted_at = ?, line_index = ?, updated_at = ? WHERE dataset_id = ? AND id = ?",
                 (now, park_index, now, dataset_id, line_id),
@@ -834,11 +914,11 @@ class DatasetStore:
             for r in snap:
                 conn.execute(
                     "INSERT INTO lines (id, dataset_id, line_index, role, eval_part, conversation_key, turn_index, text, "
-                    "raw_transcript, source, review_status, flags_json, metadata_json, text_hash, created_at, updated_at) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    "tag, raw_transcript, source, review_status, flags_json, metadata_json, text_hash, created_at, updated_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         r["line_id"], dataset_id, r["line_index"], r["role"], r["eval_part"], r["conversation_key"],
-                        r["turn_index"], r["text"], r["raw_transcript"], r["source"], r["review_status"],
+                        r["turn_index"], r["text"], r["tag"], r["raw_transcript"], r["source"], r["review_status"],
                         r["flags_json"], r["metadata_json"], r["text_hash"], r["created_at"], now,
                     ),
                 )
@@ -915,7 +995,7 @@ class DatasetStore:
             conn.execute("BEGIN IMMEDIATE")
             now = _now()
             existing = conn.execute(
-                "SELECT id FROM capture_segments WHERE id = ?", (client_segment_id,)
+                "SELECT status, line_id FROM capture_segments WHERE id = ?", (client_segment_id,)
             ).fetchone()
             if existing is None:
                 conn.execute(
@@ -923,6 +1003,10 @@ class DatasetStore:
                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                     (client_segment_id, dataset_id, audio_path, audio_sha256, duration_ms, status_value, now, now),
                 )
+            elif existing["status"] == "appended" and existing["line_id"]:
+                # Once a segment has produced a line, retries must not downgrade it
+                # back to stored/transcribed/failed and reopen the append path.
+                pass
             else:
                 conn.execute(
                     "UPDATE capture_segments SET dataset_id = ?, audio_path = COALESCE(?, audio_path), "
@@ -946,7 +1030,8 @@ class DatasetStore:
         try:
             conn.execute("BEGIN IMMEDIATE")
             conn.execute(
-                "UPDATE capture_segments SET status = 'failed', error = ?, updated_at = ? WHERE id = ?",
+                "UPDATE capture_segments SET status = 'failed', error = ?, updated_at = ? "
+                "WHERE id = ? AND NOT (status = 'appended' AND line_id IS NOT NULL)",
                 (error[:2000], _now(), client_segment_id),
             )
             conn.execute("COMMIT")
@@ -969,6 +1054,7 @@ class DatasetStore:
         raw_transcript: str | None,
         metadata: dict[str, Any],
         auto_roll: bool,
+        tag: str | None = None,
     ) -> dict[str, Any]:
         """Append a captured line and mark the segment appended in one transaction (idempotent)."""
         async with self._write_lock:
@@ -984,12 +1070,15 @@ class DatasetStore:
                 raw_transcript,
                 metadata,
                 auto_roll,
+                tag,
             )
 
     def _build_append_result(self, conn: sqlite3.Connection, segment: sqlite3.Row) -> dict[str, Any]:
         line_id = segment["line_id"]
+        target_dataset_id = segment["target_dataset_id"] or segment["dataset_id"]
         line_row = conn.execute(
-            "SELECT * FROM lines WHERE id = ?", (line_id,)
+            "SELECT * FROM lines WHERE dataset_id = ? AND id = ?",
+            (target_dataset_id, line_id),
         ).fetchone()
         if line_row is None:
             raise NotFoundError("appended line missing")
@@ -1017,6 +1106,7 @@ class DatasetStore:
         raw_transcript: str | None,
         metadata: dict[str, Any],
         auto_roll: bool,
+        tag: str | None = None,
     ) -> dict[str, Any]:
         conn = self._connect()
         try:
@@ -1037,7 +1127,7 @@ class DatasetStore:
             target_id = dataset_id
             if auto_roll and self._line_count(conn, dataset_id) >= series["page_size"]:
                 target_id = self._roll_to_next_page(conn, ds, series)
-                rolled = True
+                rolled = target_id != requested_dataset_id
 
             line = self._insert_line(
                 conn,
@@ -1047,6 +1137,7 @@ class DatasetStore:
                 eval_part=eval_part,
                 conversation_key=conversation_key,
                 turn_index=turn_index,
+                tag=tag,
                 raw_transcript=raw_transcript,
                 source="voice",
                 metadata=metadata,
@@ -1058,7 +1149,7 @@ class DatasetStore:
             )
             now = _now()
             conn.execute(
-                "UPDATE capture_segments SET status = 'appended', line_id = ?, dataset_id = ?, updated_at = ? WHERE id = ?",
+                "UPDATE capture_segments SET status = 'appended', line_id = ?, target_dataset_id = ?, updated_at = ? WHERE id = ?",
                 (line["id"], target_id, now, client_segment_id),
             )
             card = self._card(conn, target_id)
@@ -1183,3 +1274,26 @@ class DatasetStore:
             records.append(rec)
 
         return "\n".join(json.dumps(r, ensure_ascii=False) for r in records) + ("\n" if records else "")
+
+    async def export_csv(self, dataset_id: str, *, scope: str = "all") -> str:
+        detail = await self.get_dataset_detail(dataset_id)
+        return self.build_csv(detail["lines"], scope=scope)
+
+    @staticmethod
+    def _csv_field(value: str | None) -> str:
+        """RFC-4180: wrap every field in double quotes, doubling embedded quotes."""
+        s = value if value is not None else ""
+        return '"' + s.replace('"', '""') + '"'
+
+    @classmethod
+    def build_csv(cls, lines: list[dict[str, Any]], *, scope: str = "all") -> str:
+        """CSV export. Header 'text,tagname' then one row per non-deleted line in line_index
+        order. Every field RFC-4180 quoted; null tag -> empty quoted field."""
+        if scope == "accepted":
+            lines = [ln for ln in lines if ln["review_status"] == "accepted"]
+        # scope == "all": keep all non-deleted lines (already non-deleted here)
+        ordered = sorted(lines, key=lambda ln: ln["line_index"])
+        rows = [cls._csv_field("text") + "," + cls._csv_field("tagname")]
+        for ln in ordered:
+            rows.append(cls._csv_field(ln["text"]) + "," + cls._csv_field(ln.get("tag")))
+        return "\r\n".join(rows) + "\r\n"
