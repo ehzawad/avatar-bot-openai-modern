@@ -18,6 +18,17 @@ Implements `docs/STUDIO_CONTRACT.md` section 5.
 The backend (FastAPI) must be running on `http://127.0.0.1:8000`. The Vite dev
 server proxies `/api/*` to it.
 
+Start the backend from the **repo root** using its virtualenv (`uvicorn` lives in
+`.venv/`, not system Python — otherwise you get `No module named uvicorn`):
+
+```bash
+# repo root, in another terminal:
+source ../.venv/bin/activate && uvicorn app.main:app --reload --port 8000
+# or without activating:  ../.venv/bin/uvicorn app.main:app --reload --port 8000
+```
+
+Then the Vite dev server (this folder):
+
 ```bash
 npm install
 npm run dev        # http://localhost:5173/studio/

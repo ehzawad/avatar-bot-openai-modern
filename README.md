@@ -95,32 +95,52 @@ It is additive to the avatar app: the existing avatar at `/` keeps working, Open
 
 The studio frontend lives in `studio-web/` (React 19 + Vite + TanStack Query + zundo). There are two ways to run it.
 
-**Live dev (Vite dev server + proxy):**
+> **Python env note.** `uvicorn` is installed in the project virtualenv at `.venv/`, not in
+> your system Python. Run the backend in one of these ways (otherwise you get
+> `No module named uvicorn`):
+> ```zsh
+> source .venv/bin/activate    # then `uvicorn ...` / `python ...` work directly
+> # — or without activating —
+> .venv/bin/uvicorn app.main:app ...
+> uv run uvicorn app.main:app ...     # if you use uv
+> ```
+> First-time setup (creates `.venv` and installs deps): `./scripts/run-dev.sh`, or
+> `uv venv && uv pip install -r requirements.txt`. Also export `OPENAI_API_KEY` before starting.
+> Only the **backend** (Terminal 1) needs the venv; the frontend (Terminal 2) is Node, not Python.
+
+**Live dev (Vite dev server + proxy) — two terminals:**
 
 ```zsh
-# Terminal 1 — backend
+# Terminal 1 — backend (Python venv)
+source .venv/bin/activate
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
-# Terminal 2 — studio frontend
+# Terminal 2 — studio frontend (Node; no venv needed)
 cd studio-web
 npm install
-npm run dev
+npm run dev          # open the URL it prints, e.g. http://localhost:5173/studio/
 ```
 
 The Vite dev server proxies `/api` to `http://127.0.0.1:8000`, so all API calls stay root-relative.
+Open the **Vite** URL (port 5173), not 8000, in this mode.
 
-**Built (served by FastAPI):**
+**Built (full app served by FastAPI on one URL):**
 
 ```zsh
-cd studio-web
-npm install
-npm run build      # tsc + vite, emits studio-web/dist
+# 1. build the studio once (re-run after frontend changes)
+cd studio-web && npm install && npm run build      # tsc + vite, emits studio-web/dist
+cd ..
+
+# 2. run the backend (serves the API AND the built studio)
+source .venv/bin/activate
+uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-When `studio-web/dist` exists, FastAPI mounts it at `/studio` (before the root avatar mount). Start the backend with `uvicorn app.main:app --host 127.0.0.1 --port 8000` and open:
+When `studio-web/dist` exists, FastAPI mounts it at `/studio` (before the root avatar mount). Open:
 
 ```text
-http://127.0.0.1:8000/studio
+http://127.0.0.1:8000/studio        # the studio
+http://127.0.0.1:8000/              # the original avatar app
 ```
 
 ### Model tiers
