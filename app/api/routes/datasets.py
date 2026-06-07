@@ -45,7 +45,6 @@ STT_PROMPTS: dict[str, str] = {
 TIER_RESPONSE_FORMAT: dict[str, str] = {
     "fast": "json",
     "best": "json",
-    "diarize": "json",
 }
 
 
@@ -53,7 +52,6 @@ def _tier_model(cfg: Settings, tier: str) -> str:
     return {
         "fast": cfg.openai_transcribe_model_fast,
         "best": cfg.openai_transcribe_model_best,
-        "diarize": cfg.openai_transcribe_model_diarize,
     }.get(tier, cfg.openai_transcribe_model_best)
 
 
@@ -126,7 +124,7 @@ async def capture(
     dataset_id: str,
     audio: UploadFile = File(...),
     client_segment_id: str = Form(...),
-    tier: Literal["fast", "best", "diarize"] = Form("best"),
+    tier: Literal["fast", "best"] = Form("best"),
     language: Literal["bn", "auto", "en"] = Form("bn"),
     prompt_id: str = Form("bn-codeswitch-v1"),
     auto_roll: bool = Form(True),
@@ -185,18 +183,12 @@ async def capture(
         status_value="stored",
     )
 
-    # Build transcription parameters.
+    # Build transcription parameters. Both tiers (gpt-4o-mini-transcribe / gpt-4o-transcribe)
+    # take the Bengali prompt and request logprobs for QC.
     model = _tier_model(cfg, tier)
     response_format = TIER_RESPONSE_FORMAT.get(tier, "json")
-    extra: dict[str, object] = {"temperature": "0"}
-    # The diarization model has a restricted parameter surface: it rejects `prompt`
-    # ("Prompt is not supported for diarization models") and the include[]/timestamp
-    # extras. fast/best (gpt-4o(-mini)-transcribe) take the Bengali prompt + logprobs QC.
-    if tier == "diarize":
-        prompt: str | None = None
-    else:
-        prompt = STT_PROMPTS.get(prompt_id, STT_PROMPTS["bn-codeswitch-v1"])
-        extra["include[]"] = ["logprobs"]
+    prompt = STT_PROMPTS.get(prompt_id, STT_PROMPTS["bn-codeswitch-v1"])
+    extra: dict[str, object] = {"temperature": "0", "include[]": ["logprobs"]}
 
     try:
         result = await openai.transcribe(

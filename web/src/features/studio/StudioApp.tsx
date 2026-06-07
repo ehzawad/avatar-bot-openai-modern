@@ -25,7 +25,7 @@ const TAG_KEY = 'studio.tag';
 
 function loadTier(): Tier {
   const v = localStorage.getItem(TIER_KEY);
-  if (v === 'fast' || v === 'best' || v === 'diarize') return v;
+  if (v === 'fast' || v === 'best') return v;
   return 'best'; // default tier per contract
 }
 

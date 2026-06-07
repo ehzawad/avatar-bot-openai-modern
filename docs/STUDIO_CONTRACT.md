@@ -3,8 +3,9 @@
 > **SUPERSEDED in three places by later work:** (1) the frontend now lives in the unified `web/`
 > app (see [WEB_CONTRACT.md](WEB_CONTRACT.md)), not `studio-web/`; (2) `/` is now the landing
 > page, the avatar app is at `/avatar`, and the studio remains at `/studio`; (3) the transcription
-> tiers are now `fast` / `best` / **`diarize`** (`gpt-4o-transcribe-diarize`) — the `whisper` /
-> `whisper-1` tier and `OPENAI_TRANSCRIBE_MODEL_WHISPER` were removed. Everything else below still
+> tiers are now `fast` (`gpt-4o-mini-transcribe`) / `best` (`gpt-4o-transcribe`, default) — the
+> `whisper`/`whisper-1` and `diarize`/`gpt-4o-transcribe-diarize` tiers were removed (diarize
+> romanized Bengali). Everything else below still
 > holds.
 
 This document is the **single source of truth**. Backend, frontend, and docs are all
@@ -232,14 +233,13 @@ IDs: `ser_`, `ds_`, `ln_` prefixes. Timestamps ISO-8601 UTC strings.
 ### Capture (primary voice loop — audio-first, idempotent)
 - `POST /api/datasets/{dataset_id}/capture` — multipart form:
   - `audio` (file), `client_segment_id` (str, idempotency key, required),
-  - `tier` (`fast|best|diarize`, default `best`), `language` (`bn|auto|en`, default `bn`),
+  - `tier` (`fast|best`, default `best`), `language` (`bn|auto|en`, default `bn`),
   - `prompt_id` (default `bn-codeswitch-v1`), `auto_roll` (`true|false`, default `true`),
   - `role` (`user|assistant|interviewer|system`, default `user`), `eval_part`
     (`prompt|context|expected|ignored`, default `ignored`), `tag` (optional),
   - `conversation_key` (optional), `turn_index` (optional int), `duration_ms` (optional int).
   - `tier`/`language`/`role`/`eval_part` are enum-validated at parse time → **422 before any
-    side effect**. `diarize` (`gpt-4o-transcribe-diarize`) is sent no `prompt`/`include[]`
-    (it rejects them) and transcribes Bengali in Latin script — prefer `best` for Bengali text.
+    side effect**. Both tiers send the Bengali prompt + logprobs.
   - Flow: **validate enums (422) → check dataset exists (404) → reject empty audio (400) →**
     persist audio under `data/audio/` → upsert `capture_segments` (idempotent) → transcribe →
     append line (+ auto-roll) in one tx → return `AppendResult`. Validation precedes the OpenAI

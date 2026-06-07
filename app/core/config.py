@@ -24,7 +24,6 @@ class Settings(BaseSettings):
     openai_transcribe_model: str = Field(default="gpt-4o-mini-transcribe", validation_alias="OPENAI_TRANSCRIBE_MODEL")
     openai_transcribe_model_fast: str = Field(default="gpt-4o-mini-transcribe", validation_alias="OPENAI_TRANSCRIBE_MODEL_FAST")
     openai_transcribe_model_best: str = Field(default="gpt-4o-transcribe", validation_alias="OPENAI_TRANSCRIBE_MODEL_BEST")
-    openai_transcribe_model_diarize: str = Field(default="gpt-4o-transcribe-diarize", validation_alias="OPENAI_TRANSCRIBE_MODEL_DIARIZE")
     data_dir: str = Field(default="data", validation_alias="DATA_DIR")
     dataset_page_size_default: int = Field(default=50, gt=0, validation_alias="DATASET_PAGE_SIZE_DEFAULT")
     openai_tts_voice: str = Field(default="alloy", validation_alias="OPENAI_TTS_VOICE")

@@ -185,9 +185,8 @@ Transcription tier is resolved server-side (the backend never trusts a raw model
 |-----------|--------------------------|--------------------------------|
 | `fast`    | `gpt-4o-mini-transcribe`   | quick, lower cost              |
 | `best`    | `gpt-4o-transcribe`        | **default** (eval quality, Bengali script) |
-| `diarize` | `gpt-4o-transcribe-diarize`| speaker-aware (multi-speaker); note: no prompt support, so it romanizes Bengali |
 
-`fast`/`best` always send `language` (default `bn`, override `bn | auto | en`), `temperature=0`, a versioned Bengali prompt (default `bn-codeswitch-v1`), and request logprobs for QC. The `diarize` model has a restricted parameter surface (it rejects `prompt`/`include[]`), so it is sent `language` + `temperature` only — great for separating speakers, but it transcribes Bengali in Latin script; prefer `best` for Bengali-script eval text. Override the tier model strings via `OPENAI_TRANSCRIBE_MODEL_FAST`, `OPENAI_TRANSCRIBE_MODEL_BEST`, and `OPENAI_TRANSCRIBE_MODEL_DIARIZE`.
+Both tiers send `language` (default `bn`, override `bn | auto | en`), `temperature=0`, a versioned Bengali prompt (default `bn-codeswitch-v1`), and request logprobs for QC. Override the tier model strings via `OPENAI_TRANSCRIBE_MODEL_FAST` and `OPENAI_TRANSCRIBE_MODEL_BEST`.
 
 ### Where data lives
 

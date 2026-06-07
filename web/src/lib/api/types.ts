@@ -7,7 +7,7 @@
 // Studio types (ported from studio-web/src/api/types.ts + tag delta)
 // ---------------------------------------------------------------------------
 
-export type Tier = 'fast' | 'best' | 'diarize';
+export type Tier = 'fast' | 'best';
 export type Role = 'user' | 'assistant' | 'interviewer' | 'system';
 export type EvalPart = 'prompt' | 'context' | 'expected' | 'ignored';
 export type ReviewStatus = 'unreviewed' | 'accepted' | 'rejected' | 'needs_review';

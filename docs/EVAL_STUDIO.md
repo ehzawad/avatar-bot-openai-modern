@@ -176,10 +176,8 @@ Transcription is tuned for Bengali conversational utterances with English code-s
 - **Hallucination gating:** the prompt explicitly tells the model to transcribe only what is
   audible and to leave the output empty when nothing is heard, rather than inventing plausible
   Bengali. Tier choice supports this — `best` (`gpt-4o-transcribe`) is the default for eval
-  quality, and the `fast`/`best` `gpt-4o-*` tiers request logprobs so the recorded `metadata`
-  can carry a logprob average for downstream confidence review. The `diarize`
-  (`gpt-4o-transcribe-diarize`) tier is speaker-aware but rejects `prompt`/`include[]`, so it
-  romanizes Bengali — prefer `best` for Bengali-script text, use `diarize` for multi-speaker.
+  quality, and both `gpt-4o-*` tiers request logprobs so the recorded `metadata` can carry a
+  logprob average for downstream confidence review.
 
 Because the original ASR draft is preserved in each line's `raw_transcript` and never overwritten
 by edits, reviewers can always compare the gold `text` against what the model actually produced.

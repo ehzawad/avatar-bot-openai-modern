@@ -3,7 +3,6 @@ import type { Tier } from '../../../lib/api/types';
 const TIER_OPTIONS: { value: Tier; label: string }[] = [
   { value: 'best', label: 'Best (gpt-4o-transcribe)' },
   { value: 'fast', label: 'Fast (gpt-4o-mini-transcribe)' },
-  { value: 'diarize', label: 'Diarize (gpt-4o-transcribe-diarize)' },
 ];
 
 interface Props {

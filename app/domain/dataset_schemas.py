@@ -9,7 +9,6 @@ from pydantic import BaseModel, Field
 class Tier(StrEnum):
     fast = "fast"
     best = "best"
-    diarize = "diarize"
 
 
 class Role(StrEnum):
