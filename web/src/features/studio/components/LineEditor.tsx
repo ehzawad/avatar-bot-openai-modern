@@ -102,6 +102,30 @@ export function LineEditor({ dataset, highlightLineId }: Props) {
   const [newEvalPart, setNewEvalPart] = useState<EvalPart>('ignored');
   const [newTag, setNewTag] = useState('');
 
+  // Quick-copy a line's Bengali text to the clipboard (typing Bengali is cumbersome).
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const copyText = async (line: Line) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(line.text);
+      } else {
+        // Fallback for non-secure contexts (no navigator.clipboard).
+        const ta = document.createElement('textarea');
+        ta.value = line.text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopiedId(line.id);
+      window.setTimeout(() => setCopiedId((c) => (c === line.id ? null : c)), 1200);
+    } catch {
+      /* clipboard blocked — ignore */
+    }
+  };
+
   const startEdit = (line: Line) => {
     begin({
       lineId: line.id,
@@ -332,6 +356,14 @@ export function LineEditor({ dataset, highlightLineId }: Props) {
 
               {!editing ? (
                 <div className="line-actions">
+                  <button
+                    type="button"
+                    className={`btn btn--sm ${copiedId === line.id ? 'btn--accept' : ''}`}
+                    onClick={() => copyText(line)}
+                    title="Copy text to clipboard"
+                  >
+                    {copiedId === line.id ? '✓ Copied' : 'Copy'}
+                  </button>
                   <button
                     type="button"
                     className="btn btn--sm"
