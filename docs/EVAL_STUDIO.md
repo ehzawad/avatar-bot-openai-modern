@@ -175,7 +175,7 @@ Transcription is tuned for Bengali conversational utterances with English code-s
 - **Determinism:** `temperature=0` on every request.
 - **Hallucination gating:** the prompt explicitly tells the model to transcribe only what is
   audible and to leave the output empty when nothing is heard, rather than inventing plausible
-  Bengali. Tier choice supports this — `best` (`gpt-4o-transcribe`) is the default for eval
+  Bengali. Tier choice supports this — `best` (`gpt-transcribe`) is the default for eval
   quality, and both `gpt-4o-*` tiers request logprobs so the recorded `metadata` can carry a
   logprob average for downstream confidence review.
 

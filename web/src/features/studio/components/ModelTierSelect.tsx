@@ -1,7 +1,7 @@
 import type { Tier } from '../../../lib/api/types';
 
 const TIER_OPTIONS: { value: Tier; label: string }[] = [
-  { value: 'best', label: 'Best (gpt-4o-transcribe)' },
+  { value: 'best', label: 'Best (gpt-transcribe)' },
   { value: 'fast', label: 'Fast (gpt-4o-mini-transcribe)' },
 ];
 

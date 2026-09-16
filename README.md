@@ -102,13 +102,13 @@ http://127.0.0.1:8000/studio        # the Bengali Eval Studio
 ## Optional model overrides
 
 ```zsh
-export OPENAI_RESPONSE_MODEL='gpt-5.4-mini'
+export OPENAI_RESPONSE_MODEL='gpt-5.6-luna'
 export OPENAI_TTS_MODEL='gpt-4o-mini-tts'
 export OPENAI_TRANSCRIBE_MODEL='gpt-4o-mini-transcribe'
 export OPENAI_TTS_VOICE='alloy'
 ```
 
-The default response model is `gpt-5.4-mini` to keep latency/cost reasonable while staying on the latest GPT family documented by OpenAI. Use `gpt-5.5` if you want the flagship model and accept higher cost/latency.
+The default response model is `gpt-5.6-luna`, the current GPT-5.6 tier. Its siblings `gpt-5.6-sol` and `gpt-5.6-terra` are drop-in alternatives, and the older `gpt-5.4-mini` remains a lower-cost fallback.
 
 ## Live interview mode
 
@@ -184,9 +184,16 @@ Transcription tier is resolved server-side (the backend never trusts a raw model
 | tier      | model string             | notes                          |
 |-----------|--------------------------|--------------------------------|
 | `fast`    | `gpt-4o-mini-transcribe`   | quick, lower cost              |
-| `best`    | `gpt-4o-transcribe`        | **default** (eval quality, Bengali script) |
+| `best`    | `gpt-transcribe`           | **default** (eval quality, Bengali script) |
 
 Both tiers send `language` (default `bn`, override `bn | auto | en`), `temperature=0`, a versioned Bengali prompt (default `bn-codeswitch-v1`), and request logprobs for QC. Override the tier model strings via `OPENAI_TRANSCRIBE_MODEL_FAST` and `OPENAI_TRANSCRIBE_MODEL_BEST`.
+
+`best` moved from `gpt-4o-transcribe` to `gpt-transcribe`. On hard Bengali audio the old model was
+unstable: at `temperature=0` it returned three different transcripts across three runs of the same
+clip, with mean token confidence around 0.44-0.58. `gpt-transcribe` returned an identical transcript
+on every run at ~0.999 confidence. It is slightly slower (about 1.3s vs 0.9s mean on the sample
+clips) and that is the trade being made. `gpt-live-transcribe` is deliberately **not** used: it is a
+realtime WebSocket model and returns 404 on `POST /v1/audio/transcriptions`.
 
 ### Where data lives
 

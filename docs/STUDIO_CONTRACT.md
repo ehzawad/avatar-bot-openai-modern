@@ -3,7 +3,7 @@
 > **SUPERSEDED in three places by later work:** (1) the frontend now lives in the unified `web/`
 > app (see [WEB_CONTRACT.md](WEB_CONTRACT.md)), not `studio-web/`; (2) `/` is now the landing
 > page, the avatar app is at `/avatar`, and the studio remains at `/studio`; (3) the transcription
-> tiers are now `fast` (`gpt-4o-mini-transcribe`) / `best` (`gpt-4o-transcribe`, default) — the
+> tiers are now `fast` (`gpt-4o-mini-transcribe`) / `best` (`gpt-transcribe`, default) — the
 > `whisper`/`whisper-1` and `diarize`/`gpt-4o-transcribe-diarize` tiers were removed (diarize
 > romanized Bengali). Everything else below still
 > holds.
@@ -43,7 +43,7 @@ Tier → model string map (backend authoritative; never trust a raw model string
 | tier      | model string              | response_format | timestamps |
 |-----------|---------------------------|-----------------|------------|
 | `fast`    | `gpt-4o-mini-transcribe`  | `json`          | no         |
-| `best`    | `gpt-4o-transcribe`       | `json`          | no         |
+| `best`    | `gpt-transcribe`          | `json`          | no         |
 | `whisper` | `whisper-1`               | `verbose_json`  | segment    |
 
 - **Default tier = `best`** (eval quality). Frontend may default the selector to `best`.
@@ -77,7 +77,7 @@ async def transcribe(
 Config additions (`app/core/config.py`):
 ```python
 openai_transcribe_model_fast: str = "gpt-4o-mini-transcribe"   # env OPENAI_TRANSCRIBE_MODEL_FAST
-openai_transcribe_model_best: str = "gpt-4o-transcribe"        # env OPENAI_TRANSCRIBE_MODEL_BEST
+openai_transcribe_model_best: str = "gpt-transcribe"            # env OPENAI_TRANSCRIBE_MODEL_BEST
 openai_transcribe_model_whisper: str = "whisper-1"             # env OPENAI_TRANSCRIBE_MODEL_WHISPER
 data_dir: str = "data"                                         # env DATA_DIR
 dataset_page_size_default: int = 50                            # env DATASET_PAGE_SIZE_DEFAULT
@@ -267,7 +267,7 @@ IDs: `ser_`, `ds_`, `ln_` prefixes. Timestamps ISO-8601 UTC strings.
   ```json
   {"id":"ex_<key>","messages":[{"role":"user","content":"..."}],
    "expected":{"role":"assistant","content":"..."},
-   "metadata":{"dataset_id":"ds_..","language":"bn","stt_model":"gpt-4o-transcribe","line_ids":["ln_.."]}}
+   "metadata":{"dataset_id":"ds_..","language":"bn","stt_model":"gpt-transcribe","line_ids":["ln_.."]}}
   ```
   `scope`=`accepted` (default) exports only `review_status='accepted'`; `all` exports all
   non-deleted. Lines with `eval_part='ignored'` and null conversation_key export as a single

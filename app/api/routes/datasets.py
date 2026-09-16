@@ -183,7 +183,7 @@ async def capture(
         status_value="stored",
     )
 
-    # Build transcription parameters. Both tiers (gpt-4o-mini-transcribe / gpt-4o-transcribe)
+    # Build transcription parameters. Both tiers (gpt-4o-mini-transcribe / gpt-transcribe)
     # take the Bengali prompt and request logprobs for QC.
     model = _tier_model(cfg, tier)
     response_format = TIER_RESPONSE_FORMAT.get(tier, "json")
