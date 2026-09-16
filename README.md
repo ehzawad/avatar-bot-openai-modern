@@ -104,7 +104,7 @@ http://127.0.0.1:8000/studio        # the Bengali Eval Studio
 ```zsh
 export OPENAI_RESPONSE_MODEL='gpt-5.6-luna'
 export OPENAI_TTS_MODEL='gpt-4o-mini-tts'
-export OPENAI_TRANSCRIBE_MODEL='gpt-4o-mini-transcribe'
+export OPENAI_TRANSCRIBE_MODEL='gpt-transcribe'
 export OPENAI_TTS_VOICE='alloy'
 ```
 

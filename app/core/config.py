@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     openai_base_url: str = Field(default="https://api.openai.com/v1", validation_alias="OPENAI_BASE_URL")
     openai_response_model: str = Field(default="gpt-5.6-luna", validation_alias="OPENAI_RESPONSE_MODEL")
     openai_tts_model: str = Field(default="gpt-4o-mini-tts", validation_alias="OPENAI_TTS_MODEL")
-    openai_transcribe_model: str = Field(default="gpt-4o-mini-transcribe", validation_alias="OPENAI_TRANSCRIBE_MODEL")
+    openai_transcribe_model: str = Field(default="gpt-transcribe", validation_alias="OPENAI_TRANSCRIBE_MODEL")
     openai_transcribe_model_fast: str = Field(default="gpt-4o-mini-transcribe", validation_alias="OPENAI_TRANSCRIBE_MODEL_FAST")
     openai_transcribe_model_best: str = Field(default="gpt-transcribe", validation_alias="OPENAI_TRANSCRIBE_MODEL_BEST")
     data_dir: str = Field(default="data", validation_alias="DATA_DIR")
