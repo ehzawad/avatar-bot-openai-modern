@@ -195,6 +195,31 @@ on every run at ~0.999 confidence. It is slightly slower (about 1.3s vs 0.9s mea
 clips) and that is the trade being made. `gpt-live-transcribe` is deliberately **not** used: it is a
 realtime WebSocket model and returns 404 on `POST /v1/audio/transcriptions`.
 
+### Serving on the LAN (and why the microphone needs HTTPS)
+
+```zsh
+HOST=0.0.0.0 HTTPS=1 ./scripts/run.sh        # reachable from other devices, mic works
+```
+
+Both tool surfaces record audio in the browser. Browsers only expose
+`getUserMedia` in a **secure context**: HTTPS, or `localhost`/`127.0.0.1`, which are the
+only plain-HTTP exemptions. Serving over plain HTTP to a LAN address therefore loads the
+page fine and then fails the moment you press record, because `navigator.mediaDevices` is
+not defined at all.
+
+`HTTPS=1` generates a self-signed cert via `scripts/make-cert.sh` if one is missing and
+hands it to uvicorn. The cert lists every local IPv4 address as a SAN, so it is valid for
+whatever address other devices use. Nothing is purchased and no external key is needed.
+Each device shows a one-time warning; accept it (**Advanced -> Proceed**) and the
+microphone works. Certs live in `certs/` and are gitignored — never commit the key.
+
+`HTTPS=1` applies to the backend only. In `./scripts/run.sh dev` the Vite dev server still
+serves plain HTTP, so use the default mode for LAN testing with audio.
+
+> The server has no authentication and spends against your OpenAI key. Anyone who can
+> reach it on the network can run transcription and chat requests on your account, so
+> bind to `0.0.0.0` only on a network you trust.
+
 ### Where data lives
 
 The SQLite DB and recorded audio live under `data/` (created at runtime), never under any static directory and never web-served:

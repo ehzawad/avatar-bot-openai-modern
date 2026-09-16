@@ -275,7 +275,21 @@ export function useRecorder(): UseRecorderResult {
         return { finished: Promise.reject(new Error('Recorder is already recording.')) };
       }
       if (!navigator.mediaDevices?.getUserMedia) {
-        const err = new Error('This browser does not support microphone capture.');
+        // `navigator.mediaDevices` is undefined in two very different situations:
+        // a genuinely ancient browser, or — far more commonly — a page served over
+        // plain HTTP from a non-loopback origin. Browsers only expose microphone
+        // capture in a secure context (HTTPS, or localhost/127.0.0.1, which are
+        // exempt). Blaming the browser in the second case sends people hunting for
+        // the wrong problem, so name the real cause.
+        const insecure = typeof window !== 'undefined' && !window.isSecureContext;
+        const err = new Error(
+          insecure
+            ? `Microphone capture needs a secure origin. This page is served over ` +
+              `${window.location.protocol}//${window.location.host}, and browsers only allow ` +
+              `the microphone on HTTPS or on localhost. Reopen this page over HTTPS ` +
+              `(run the server with HTTPS=1) or via an SSH tunnel to localhost.`
+            : 'This browser does not support microphone capture.',
+        );
         if (mountedRef.current) dispatch({ type: 'error', error: err });
         return { finished: Promise.reject(err) };
       }
